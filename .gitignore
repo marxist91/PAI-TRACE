@@ -1,0 +1,57 @@
+# Dependencies
+**/node_modules/
+
+# Environment variables and private credentials
+**/.env
+**/.env.*
+!**/.env.example
+
+# Build outputs and caches
+**/dist/
+**/build/
+**/.vite/
+**/.cache/
+**/coverage/
+**/*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
+
+# Expo / React Native local state
+frontend/.expo/
+frontend/.expo-shared/
+frontend/web-build/
+
+# Prisma local CLI state
+**/.prisma/
+
+# Runtime files
+**/*.log
+**/logs/
+**/uploads/
+**/*.pid
+**/*.pid.lock
+
+# Local databases and temporary spreadsheet imports
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/~$*.xlsx
+**/~$*.xls
+
+# Local editor and agent configuration
+.vscode/
+.idea/
+**/.agents/
+**/.claude/
+**/.windsurf/
+
+# Operating system files
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Test and temporary files
+**/.nyc_output/
+**/tmp/
+**/temp/
+*.tmp

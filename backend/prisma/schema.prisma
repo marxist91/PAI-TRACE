@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Utilisateurs ───────────────────────────────────────────────────
+enum Role {
+  LOGISTICIEN
+  CONSIGNATAIRE
+  CONTROLEUR_LCT
+  CONTROLEUR_TOGO
+  AGENT_PIA
+  CLIENT
+}
+
+model User {
+  id              Int            @id @default(autoincrement())
+  email           String         @unique
+  password        String // hashé avec bcrypt
+  nom             String
+  prenom          String
+  telephone       String?
+  role            Role           @default(CLIENT)
+  consignataireId Int?
+  consignataire   Consignataire? @relation(fields: [consignataireId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  conteneurs    Conteneur[]
+  mouvements    Mouvement[]
+  notifications Notification[]
+  refreshTokens RefreshToken[]
+  manifestes    ManifesteImport[]
+
+  @@index([consignataireId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── Consignataires (ex: Maersk, MSC, CMA CGM) ────────────────────
+model Consignataire {
+  id   Int    @id @default(autoincrement())
+  nom  String @unique
+  code String @unique // ex: MSK, MSC, CMA
+
+  conteneurs   Conteneur[]
+  utilisateurs User[]
+}
+
+// ─── Conteneurs ─────────────────────────────────────────────────────
+enum StatutConteneur {
+  ATTENDU_PIA
+  VU_A_QUAI
+  SORTI_TERMINAL
+  ENTRE_PIA
+  SORTI_PIA
+  EN_ATTENTE
+  CHEZ_CONSIGNATAIRE
+  EN_TRANSIT_VERS_TERMINAL
+  AU_TERMINAL
+  DECHARGE_SOUS_PALAN
+  EN_TRANSIT_VERS_PIA
+  ARRIVE_PIA
+  STOCKE_PIA
+  DOUANE
+  LIVRE
+}
+
+enum TerminalAffecte {
+  LCT
+  TOGO
+}
+
+model Conteneur {
+  id                 Int              @id @default(autoincrement())
+  numeroConteneur    String?          @unique
+  numeroBL           String // numéro de connaissement (B/L)
+  atp                String?
+  consignataireId    Int
+  consignataire      Consignataire    @relation(fields: [consignataireId], references: [id])
+  clientId           Int
+  client             User             @relation(fields: [clientId], references: [id])
+  destination        String
+  typeMarchandise    String
+  dateArrivee        DateTime
+  statut             StatutConteneur  @default(EN_ATTENTE)
+  terminalAffecte    TerminalAffecte?
+  datePrevuePia      DateTime?
+  dateDebarquement   DateTime?
+  vueAQuaiAt         DateTime?
+  dateSortieTerminal DateTime?
+  dateEntreePia      DateTime?
+  dateSortiePia      DateTime?
+  paysDestination    String?
+  manifesteId        Int?
+  manifeste          ManifesteImport? @relation(fields: [manifesteId], references: [id], onDelete: SetNull)
+  isDemo             Boolean          @default(false)
+  isDemoAnomaly      Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  checkpoints Checkpoint[]
+  mouvements  Mouvement[]
+
+  @@index([terminalAffecte])
+  @@index([numeroBL])
+  @@index([atp])
+  @@index([datePrevuePia])
+  @@index([dateDebarquement])
+  @@index([dateSortieTerminal])
+  @@index([dateEntreePia])
+  @@index([dateSortiePia])
+  @@index([manifesteId])
+}
+
+model ManifesteImport {
+  id              Int         @id @default(autoincrement())
+  nomFichier      String
+  source          String      @default("EXCEL")
+  lignesTotal     Int
+  lignesImportees Int
+  lignesIgnorees  Int         @default(0)
+  importeParId    Int
+  importePar      User        @relation(fields: [importeParId], references: [id])
+  importedAt      DateTime    @default(now())
+  conteneurs      Conteneur[]
+
+  @@index([importedAt])
+  @@index([importeParId])
+}
+
+// ─── Checkpoints ────────────────────────────────────────────────────
+enum TypeCheckpoint {
+  CONSIGNATAIRE
+  TERMINAL_LCT
+  TERMINAL_TOGO
+  PIA
+}
+
+model Checkpoint {
+  id          Int            @id @default(autoincrement())
+  conteneurId Int
+  conteneur   Conteneur      @relation(fields: [conteneurId], references: [id])
+  type        TypeCheckpoint
+  statut      String // départ, réception, confirmation, stockage, douane
+  date        DateTime
+  lieu        String
+  notes       String?
+  createdAt   DateTime       @default(now())
+
+  mouvement Mouvement?
+}
+
+// ─── Historique des Mouvements ──────────────────────────────────────
+model Mouvement {
+  id           Int        @id @default(autoincrement())
+  conteneurId  Int
+  conteneur    Conteneur  @relation(fields: [conteneurId], references: [id])
+  checkpointId Int        @unique
+  checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id])
+  userId       Int
+  user         User       @relation(fields: [userId], references: [id])
+  action       String // DEPART, RECEPTION, CONFIRMATION, ARRIVEE
+  date         DateTime   @default(now())
+  details      String?
+}
+
+// ─── Notifications ──────────────────────────────────────────────────
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  conteneurId Int?
+  message     String
+  type        String // INFO, ALERTE, ANOMALIE
+  lu          Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+// ─── Rapports ───────────────────────────────────────────────────────
+model Rapport {
+  id        Int      @id @default(autoincrement())
+  titre     String
+  type      String // FLUX, DELAIS, ANOMALIES
+  dateDebut DateTime
+  dateFin   DateTime
+  donnees   Json // données du rapport au format JSON
+  generePar Int
+  createdAt DateTime @default(now())
+}

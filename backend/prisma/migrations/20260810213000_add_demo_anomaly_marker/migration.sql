@@ -1,0 +1,2 @@
+ALTER TABLE "Conteneur"
+ADD COLUMN "isDemoAnomaly" BOOLEAN NOT NULL DEFAULT false;
