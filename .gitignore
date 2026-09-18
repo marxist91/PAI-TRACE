@@ -32,6 +32,7 @@ frontend/web-build/
 **/*.pid.lock
 
 # Local databases and temporary spreadsheet imports
+backend/backups/
 **/*.db
 **/*.sqlite
 **/*.sqlite3

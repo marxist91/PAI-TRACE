@@ -1,72 +1,114 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
-import ExcelJS from 'exceljs';
 import { prisma } from '../lib/prisma';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { ParsedManifestRow, parseManifest, terminalForRole } from '../services/manifest-parser';
+import { previewTransfers } from '../services/transfer-preview';
+import { reconcilePia } from '../services/pia-reconciliation';
+import { importOfficialPia, persistOfficialPia } from '../services/official-pia-import';
+import { parseXmlManifest } from '../services/xml-manifest';
+import { resolveXmlDestinations } from '../services/xml-destination';
+
+async function previewXml(buffer: Buffer, role: string, dateVaq?: string) {
+  const parsed = parseXmlManifest(buffer, role, dateVaq);
+  const numbers = parsed.lignes.filter(row => row.action === 'ANALYSE').map(row => row.numeroConteneur);
+  const terminal = terminalForRole(role);
+  const registry = numbers.length ? await prisma.conteneur.findMany({
+    where: { numeroConteneur: { in: numbers }, ...(terminal ? { terminalAffecte: terminal } : {}) },
+    select: { numeroConteneur: true, paysDestination: true },
+  }) : [];
+  return resolveXmlDestinations(parsed, registry);
+}
 
 const router = Router();
+const pairUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 2 },
+  fileFilter: (_req, file, callback) => /\.xlsx$/i.test(file.originalname) ? callback(null, true) : callback(new Error('Fichier .xlsx requis')) });
+
+router.post('/rapprochement', authenticate, requireRole('LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO'),
+  pairUpload.fields([{ name: 'listePia', maxCount: 1 }, { name: 'manifeste', maxCount: 1 }]), async (req: AuthRequest, res: Response) => {
+    try {
+      const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+      const pia = files?.listePia?.[0];
+      const manifest = files?.manifeste?.[0];
+      if (!pia || !manifest) return res.status(400).json({ error: 'Choisissez la liste PIA et le manifeste.' });
+      if (await previewTransfers(pia.buffer, req.user!.role) || await previewTransfers(manifest.buffer, req.user!.role)) {
+        return res.status(400).json({ error: 'Le suivi historique ne remplace pas la liste des attendus ou le manifeste source. Utilisez ici deux fichiers à colonnes en première ligne.' });
+      }
+      const [expected, actual] = await Promise.all([parseManifest(pia.buffer, req.user!.role), parseManifest(manifest.buffer, req.user!.role)]);
+      return res.json({ rapprochement: reconcilePia(expected.rows, actual.rows) });
+    } catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : 'Comparaison impossible' }); }
+  });
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => {
-    const valid = /\.(xlsx)$/i.test(file.originalname);
+    const valid = /\.(xlsx|xml)$/i.test(file.originalname);
     if (valid) callback(null, true);
-    else callback(new Error('Le manifeste doit être un fichier Excel .xlsx'));
+    else callback(new Error('Le manifeste doit être un fichier .xlsx ou .xml'));
   },
 });
 
-const aliases: Record<string, string[]> = {
-  atp: ['ATP', 'NUMERO ATP', 'N ATP'],
-  numeroConteneur: ['NUMERO CONTENEUR', 'N CONTENEUR', 'CONTENEUR', 'CONTAINER NUMBER', 'CONTAINER NO'],
-  numeroBL: ['BL', 'NUMERO BL', 'N BL', 'CONNAISSEMENT', 'BILL OF LADING'],
-  terminal: ['TERMINAL', 'MANUTENTIONNAIRE', 'CHECKPOINT'],
-  datePrevuePia: ['DATE PREVUE PIA', 'ARRIVEE PREVUE PIA', 'ETA PIA'],
-  dateDebarquement: ['DATE DEBARQUEMENT', 'VU A QUAI', 'DATE VAQ', 'VAQ'],
-  paysDestination: ['PAYS DESTINATION', 'PAYS DE DESTINATION', 'DESTINATION'],
-  typeMarchandise: ['MARCHANDISE', 'TYPE MARCHANDISE', 'DESCRIPTION MARCHANDISE'],
-  consignataire: ['CONSIGNATAIRE', 'COMPAGNIE MARITIME', 'ARMATEUR'],
+type ResolvedManifestRow = ParsedManifestRow & {
+  action: 'CREATION' | 'MISE_A_JOUR' | 'IGNOREE';
+  existingId: number | null;
 };
 
-function normalize(value: string) {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+async function resolveExistingContainers(rows: ParsedManifestRow[], forcedTerminal: 'LCT' | 'TOGO' | null): Promise<ResolvedManifestRow[]> {
+  const containerNumbers = rows.flatMap((row) => row.numeroConteneur ? [row.numeroConteneur] : []);
+  const billNumbers = rows.flatMap((row) => !row.numeroConteneur && row.numeroBL ? [row.numeroBL] : []);
+  const filters = [
+    ...(containerNumbers.length ? [{ numeroConteneur: { in: containerNumbers } }] : []),
+    ...(billNumbers.length ? [{ numeroBL: { in: billNumbers } }] : []),
+  ];
+  const existingContainers = filters.length ? await prisma.conteneur.findMany({
+    where: { OR: filters },
+    select: { id: true, numeroConteneur: true, numeroBL: true, terminalAffecte: true },
+  }) : [];
+  const byContainer = new Map(existingContainers.flatMap((item) => item.numeroConteneur ? [[item.numeroConteneur, item] as const] : []));
+  const byBill = new Map<string, typeof existingContainers>();
+  for (const item of existingContainers) byBill.set(item.numeroBL, [...(byBill.get(item.numeroBL) ?? []), item]);
+
+  return rows.map((row) => {
+    const billMatches = !row.numeroConteneur && row.numeroBL ? byBill.get(row.numeroBL) ?? [] : [];
+    const existing = row.numeroConteneur ? byContainer.get(row.numeroConteneur) : billMatches.length === 1 ? billMatches[0] : undefined;
+    const issues = [...row.issues];
+    let accepted = row.accepted;
+    if (!existing || !row.numeroConteneur) {
+      issues.push('Absent du registre PIA ou numéro de conteneur manquant : chargez d’abord la liste officielle PIA. Aucun ajout depuis le manifeste seul.');
+      accepted = false;
+    }
+    if (accepted && !row.numeroConteneur && billMatches.length > 1) {
+      issues.push('B/L associé à plusieurs conteneurs : ajoutez le numéro de conteneur');
+      accepted = false;
+    }
+    if (accepted && forcedTerminal && existing?.terminalAffecte && existing.terminalAffecte !== forcedTerminal) {
+      issues.push(`Conteneur déjà rattaché au terminal ${existing.terminalAffecte}`);
+      accepted = false;
+    }
+    return {
+      ...row,
+      accepted,
+      issues,
+      existingId: existing?.id ?? null,
+      action: !accepted ? 'IGNOREE' : existing ? 'MISE_A_JOUR' : 'CREATION',
+    };
+  });
 }
 
-function columnMap(worksheet: ExcelJS.Worksheet) {
-  const headers = new Map<string, number>();
-  worksheet.getRow(1).eachCell((cell, column) => headers.set(normalize(cell.text), column));
-  return Object.fromEntries(Object.entries(aliases).map(([field, names]) => {
-    const column = names.map(normalize).map((name) => headers.get(name)).find(Boolean);
-    return [field, column];
-  })) as Record<keyof typeof aliases, number | undefined>;
-}
-
-function textAt(row: ExcelJS.Row, column?: number) {
-  return column ? row.getCell(column).text.trim() : '';
-}
-
-function dateAt(row: ExcelJS.Row, column?: number): Date | null {
-  if (!column) return null;
-  const value = row.getCell(column).value;
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
-  if (typeof value === 'number') return new Date(Date.UTC(1899, 11, 30) + value * 86_400_000);
-  const text = row.getCell(column).text.trim();
-  const french = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
-  if (french) return new Date(Number(french[3]), Number(french[2]) - 1, Number(french[1]), Number(french[4] ?? 0), Number(french[5] ?? 0));
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function terminalValue(value: string): 'LCT' | 'TOGO' | null {
-  const normalized = normalize(value);
-  if (normalized.includes('LCT')) return 'LCT';
-  if (normalized.includes('TOGO')) return 'TOGO';
-  return null;
-}
-
-function terminalForRole(role: string): 'LCT' | 'TOGO' | null {
-  if (role === 'CONTROLEUR_LCT') return 'LCT';
-  if (role === 'CONTROLEUR_TOGO') return 'TOGO';
-  return null;
+function previewRow(row: ResolvedManifestRow) {
+  return {
+    line: row.line,
+    numeroConteneur: row.numeroConteneur,
+    numeroBL: row.numeroBL,
+    atp: row.atp,
+    terminal: row.terminalAffecte,
+    datePrevuePia: row.datePrevuePia?.toISOString() ?? null,
+    dateDebarquement: row.dateDebarquement?.toISOString() ?? null,
+    paysDestination: row.paysDestination,
+    typeMarchandise: row.typeMarchandise,
+    action: row.action,
+    issues: row.issues,
+  };
 }
 
 router.get('/', authenticate, requireRole('LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO'), async (req: AuthRequest, res: Response) => {
@@ -86,31 +128,81 @@ router.get('/', authenticate, requireRole('LOGISTICIEN', 'CONTROLEUR_LCT', 'CONT
   res.json({ manifestes });
 });
 
+router.post('/preview', authenticate, requireRole('LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO'), upload.single('fichier'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'Fichier Excel requis' });
+      return;
+    }
+    if (/\.xml$/i.test(req.file.originalname)) {
+      const xml = await previewXml(req.file.buffer, req.user!.role);
+      const displayRows = [...xml.lignes].sort((a, b) => Number(b.action === 'ANALYSE') - Number(a.action === 'ANALYSE'));
+      res.json({ preview: { ...xml, nomFichier: req.file.originalname, lignes: displayRows.slice(0, 200), apercuLimite: xml.lignes.length > 200 } });
+      return;
+    }
+    const transfer = await previewTransfers(req.file.buffer, req.user!.role);
+    if (transfer) {
+      res.json({ preview: { nomFichier: req.file.originalname, ...transfer, officiel: true } });
+      return;
+    }
+    const parsed = await parseManifest(req.file.buffer, req.user!.role);
+    const rows = await resolveExistingContainers(parsed.rows, terminalForRole(req.user!.role));
+    const readyRows = rows.filter((row) => row.accepted);
+    const previewLimit = 200;
+    res.json({
+      preview: {
+        nomFichier: req.file.originalname,
+        lignesTotal: rows.length,
+        lignesValides: readyRows.length,
+        lignesIgnorees: rows.length - readyRows.length,
+        creations: readyRows.filter((row) => row.action === 'CREATION').length,
+        misesAJour: readyRows.filter((row) => row.action === 'MISE_A_JOUR').length,
+        colonnesReconnues: parsed.recognizedColumns,
+        colonnesManquantes: parsed.missingColumns,
+        lignes: rows.slice(0, previewLimit).map(previewRow),
+        apercuLimite: rows.length > previewLimit,
+      },
+    });
+  } catch (error) {
+    console.error('Erreur aperçu manifeste:', error);
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Impossible de lire le manifeste' });
+  }
+});
+
 router.post('/import', authenticate, requireRole('LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO'), upload.single('fichier'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'Fichier Excel requis' });
       return;
     }
-    const workbook = new ExcelJS.Workbook();
-    const excelBytes = new Uint8Array(req.file.buffer);
-    await workbook.xlsx.load(excelBytes.buffer);
-    const worksheet = workbook.worksheets[0];
-    if (!worksheet || worksheet.rowCount < 2) {
-      res.status(400).json({ error: 'Le fichier ne contient aucune ligne de manifeste' });
+    if (/\.xml$/i.test(req.file.originalname)) {
+      try {
+        const xml = await previewXml(req.file.buffer, req.user!.role);
+        if (!xml.lignesValides) {
+          res.json({ manifeste: { lignesImportees: 0, lignesIgnorees: xml.lignesIgnorees, bilan: { crees: 0, completes: 0, inchanges: 0, operationsAjoutees: 0 } }, message: xml.message });
+          return;
+        }
+        if (typeof req.body.dateVaq !== 'string' || !req.body.dateVaq) { res.status(400).json({ error: 'Confirmez la date réelle Vu à quai avant import.' }); return; }
+        const confirmed = await previewXml(req.file.buffer, req.user!.role, req.body.dateVaq);
+        const manifeste = await persistOfficialPia(confirmed, req.file.buffer, req.file.originalname, req.user!);
+        res.status(201).json({ manifeste });
+      } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : 'XML invalide' }); }
       return;
     }
-    const columns = columnMap(worksheet);
-    if (!columns.numeroConteneur && !columns.numeroBL) {
-      res.status(400).json({ error: 'Ajoutez une colonne Numéro conteneur ou B/L' });
+    if (await previewTransfers(req.file.buffer, req.user!.role)) {
+      try {
+        const manifeste = await importOfficialPia(req.file.buffer, req.file.originalname, req.user!);
+        res.status(201).json({ manifeste });
+      } catch (error) {
+        res.status(409).json({ error: error instanceof Error ? error.message : 'Import officiel impossible. Aucune modification enregistrée.' });
+      }
       return;
     }
-
-    const fallbackConsignataire = await prisma.consignataire.upsert({
-      where: { code: 'MNF' }, update: {}, create: { nom: 'Manifeste non renseigné', code: 'MNF' },
-    });
+    const parsed = await parseManifest(req.file.buffer, req.user!.role);
     const forcedTerminal = terminalForRole(req.user!.role);
-    const total = worksheet.rowCount - 1;
+    const rows = await resolveExistingContainers(parsed.rows, forcedTerminal);
+
+    const total = rows.length;
     const manifeste = await prisma.manifesteImport.create({
       data: {
         nomFichier: req.file.originalname,
@@ -121,53 +213,19 @@ router.post('/import', authenticate, requireRole('LOGISTICIEN', 'CONTROLEUR_LCT'
       },
     });
     let imported = 0;
-    let ignored = 0;
+    const ignored = rows.filter((row) => !row.accepted).length;
 
-    for (let index = 2; index <= worksheet.rowCount; index += 1) {
-      const row = worksheet.getRow(index);
-      const numeroConteneur = textAt(row, columns.numeroConteneur).replace(/\s+/g, '').toUpperCase() || null;
-      const numeroBL = textAt(row, columns.numeroBL) || numeroConteneur;
-      if (!numeroBL) { ignored += 1; continue; }
-      const datePrevuePia = dateAt(row, columns.datePrevuePia);
-      const dateDebarquement = dateAt(row, columns.dateDebarquement);
-      const terminalFromFile = terminalValue(textAt(row, columns.terminal));
-      if (forcedTerminal && terminalFromFile && terminalFromFile !== forcedTerminal) {
-        ignored += 1;
-        continue;
-      }
-      const terminalAffecte = forcedTerminal ?? terminalFromFile;
-      const consignataireNom = textAt(row, columns.consignataire);
-      let consignataireId = fallbackConsignataire.id;
-      if (consignataireNom) {
-        const existing = await prisma.consignataire.findFirst({ where: { nom: { equals: consignataireNom, mode: 'insensitive' } } });
-        if (existing) consignataireId = existing.id;
-      }
-      const data = {
-        numeroBL,
-        numeroConteneur,
-        atp: textAt(row, columns.atp) || null,
-        consignataireId,
-        clientId: req.user!.id,
-        destination: textAt(row, columns.paysDestination) || 'À renseigner',
-        paysDestination: textAt(row, columns.paysDestination) || null,
-        typeMarchandise: textAt(row, columns.typeMarchandise) || 'Non renseignée',
-        dateArrivee: datePrevuePia ?? dateDebarquement ?? new Date(),
-        datePrevuePia,
-        dateDebarquement,
-        vueAQuaiAt: dateDebarquement,
-        terminalAffecte,
-        statut: dateDebarquement ? 'VU_A_QUAI' as const : 'ATTENDU_PIA' as const,
-        manifesteId: manifeste.id,
-      };
-      const existing = numeroConteneur
-        ? await prisma.conteneur.findUnique({ where: { numeroConteneur }, select: { id: true, terminalAffecte: true } })
-        : await prisma.conteneur.findFirst({ where: { numeroBL }, select: { id: true, terminalAffecte: true } });
-      if (forcedTerminal && existing?.terminalAffecte && existing.terminalAffecte !== forcedTerminal) {
-        ignored += 1;
-        continue;
-      }
-      if (existing) await prisma.conteneur.update({ where: { id: existing.id }, data });
-      else await prisma.conteneur.create({ data });
+    for (const row of rows) {
+      if (!row.accepted || !row.numeroBL) continue;
+      // Le manifeste enrichit uniquement une référence déjà inscrite au registre PIA.
+      // Il ne remplace ni les dates d'opération, ni le statut, ni la provenance officielle.
+      if (!row.existingId) continue;
+      await prisma.conteneur.update({ where: { id: row.existingId }, data: {
+        ...(parsed.columns.numeroBL && row.numeroBL && row.numeroBL !== row.numeroConteneur ? { numeroBL: row.numeroBL } : {}),
+        ...(row.atp ? { atp: row.atp } : {}),
+        ...(row.paysDestination ? { paysDestination: row.paysDestination, destination: row.paysDestination } : {}),
+        ...(row.typeMarchandise ? { typeMarchandise: row.typeMarchandise } : {}),
+      } });
       imported += 1;
     }
     await prisma.manifesteImport.update({ where: { id: manifeste.id }, data: { lignesImportees: imported, lignesIgnorees: ignored } });

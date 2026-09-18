@@ -74,6 +74,20 @@ async function main() {
   const terminal = await login('controleur.togo@pia.tg', 'CONTROLEUR_TOGO');
   const terminalOppose = await login('controleur.lct@pia.tg', 'CONTROLEUR_LCT');
   const pia = await login('agent.pia@pia.tg', 'AGENT_PIA');
+  const manifestCountBeforePreview = await prisma.manifesteImport.count();
+  const preview = await request(app)
+    .post('/api/manifestes/preview')
+    .set('Authorization', `Bearer ${terminal.accessToken}`)
+    .attach('fichier', await manifesteBuffer(), 'recette-apercu-togo.xlsx')
+    .expect(200);
+  assert.equal(preview.body.preview.lignesTotal, 1);
+  assert.equal(preview.body.preview.lignesValides, 1);
+  assert.equal(preview.body.preview.creations, 1);
+  assert.equal(preview.body.preview.lignes[0].terminal, 'TOGO');
+  assert.equal(await prisma.manifesteImport.count(), manifestCountBeforePreview);
+  assert.equal(await prisma.conteneur.findUnique({ where: { numeroConteneur } }), null);
+  console.log('  OK aperçu validé sans écriture en base');
+
   const creation = await request(app)
     .post('/api/manifestes/import')
     .set('Authorization', `Bearer ${terminal.accessToken}`)
@@ -110,6 +124,24 @@ async function main() {
     .expect(200);
   assert.equal(terminalAfterExit.body.conteneurs[0]?.id, conteneurId);
   assert.ok(terminalAfterExit.body.conteneurs[0]?.dateSortieTerminal);
+
+  const exportResponse = await request(app)
+    .get('/api/operations/export.xlsx?liste=sorties-terminal&periode=jour')
+    .set('Authorization', `Bearer ${terminal.accessToken}`)
+    .buffer(true)
+    .parse((response, callback) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+      response.on('end', () => callback(null, Buffer.concat(chunks)));
+    })
+    .expect('Content-Type', /spreadsheetml/)
+    .expect(200);
+  assert.ok(Buffer.isBuffer(exportResponse.body));
+  const exportedWorkbook = new ExcelJS.Workbook();
+  await exportedWorkbook.xlsx.load(new Uint8Array(exportResponse.body).buffer);
+  const exportedSheet = exportedWorkbook.getWorksheet('Liste opérationnelle');
+  assert.ok(exportedSheet?.getColumn(1).values.includes(numeroConteneur));
+  console.log('  OK export Excel terminal généré avec le conteneur validé');
 
   const piaQueue = await request(app)
     .get('/api/operations/pia')

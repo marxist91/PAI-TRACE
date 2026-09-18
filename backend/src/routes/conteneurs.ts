@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { operationError } from '../services/operation-validation';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
@@ -375,6 +376,12 @@ router.post('/:id/checkpoints', authenticate, requireRole('LOGISTICIEN', 'CONTRO
     }
     if (data.type === 'PIA') newStatut = /SORTIE/.test(action) ? 'SORTI_PIA' : 'ENTRE_PIA';
 
+    const validationError = operationError(conteneur, newStatut, new Date(data.date));
+    if (validationError) {
+      res.status(409).json({ error: validationError });
+      return;
+    }
+
     const operationalRecipients = await prisma.user.findMany({
       where: {
         OR: [
@@ -397,6 +404,12 @@ router.post('/:id/checkpoints', authenticate, requireRole('LOGISTICIEN', 'CONTRO
       : `${reference} : sortie de ${terminalLabel} enregistrée, conteneur attendu à la PIA.`;
 
     const result = await prisma.$transaction(async (tx) => {
+      // Claim this version before creating any event; concurrent requests cannot both succeed.
+      const claimed = await tx.conteneur.updateMany({
+        where: { id, updatedAt: conteneur.updatedAt },
+        data: { updatedAt: new Date(Math.max(Date.now(), conteneur.updatedAt.getTime() + 1)) },
+      });
+      if (claimed.count !== 1) throw new Error('OPERATION_CONFLICT');
       const checkpoint = await tx.checkpoint.create({
         data: {
           conteneurId: id,
@@ -453,6 +466,10 @@ router.post('/:id/checkpoints', authenticate, requireRole('LOGISTICIEN', 'CONTRO
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: 'Données invalides', details: error.issues });
+      return;
+    }
+    if (error instanceof Error && error.message === 'OPERATION_CONFLICT') {
+      res.status(409).json({ error: 'Ce conteneur vient d’être modifié. Actualisez la fiche avant de poursuivre.' });
       return;
     }
     console.error('Erreur création checkpoint:', error);

@@ -1,6 +1,127 @@
 # ✅ TODO — Projet PIA
 
-## Nouvelle directive PIA-TRACE - v3.2 (2026-08-18)
+## Tests de protection — 18/09/2026
+
+- [x] Ajouter `backend/scripts/test-protection-db.ts` et `npm run test:protection-db` : PostgreSQL local de recette obligatoire, différent de la base applicative.
+- [x] Exécuter 44 scénarios API LCT/Togo : authentification, rôles, séparation des terminaux, ordre des étapes, dates invalides/futures et doubles validations successives/simultanées.
+- [x] Vérifier chaque refus sans modification du conteneur ni création d'historique ou notification ; contrôler les destinataires après chaque succès.
+- [x] Nettoyer les comptes, conteneurs et événements temporaires ; aucune opération sur les données réelles.
+- [x] Suite backend : 42 tests réussis ; compilation TypeScript backend réussie.
+- [ ] Brancher cette recette sur PostgreSQL éphémère dans le contrôle automatique GitHub.
+
+## Statistiques et exports PIA — 17/09/2026
+
+- [x] Remplacer le compteur ambigu Attendus PIA par Destinés PIA — registre complet et Vus à quai par Entrées PIA — période dans les statistiques.
+- [x] Moyenne de séjour sans arrondi intermédiaire aux heures, affichée heures/minutes sur les sorties de période.
+- [x] Choix d’export : entrées et sorties PIA, entrées seules, sorties seules, séjours PIA, sorties terminaux. Aucun export statistique proposé sur les seuls vus à quai.
+- [x] Séjours : présence durant la période ; durée totale jusqu’à la sortie ou à la génération de l’export. Heures décimales conservant les minutes.
+- [ ] Valider visuellement les nouveaux filtres dans le navigateur et télécharger les nouveaux exports.
+
+## Nettoyage démos Togo Terminal — 17/09/2026
+
+- [x] Import Togo Terminal confirmé par l’utilisateur (52 conteneurs, lot 25).
+- [x] Supprimer uniquement les 1 640 conteneurs TOGO isDemo=true sans manifeste, leurs 37 checkpoints, 37 mouvements et 47 notifications.
+- [x] Sauvegarde locale hors Git : backend/backups/togo-demo-before-cleanup-1789636992348.json. Conservation vérifiée des 52 importés TOGO et 570 LCT.
+
+## Manifeste Togo Terminal LFWTERM — 17/09/2026
+
+- [x] Reconnaître manut=LFWTERM comme Togo Terminal (fichier officiel fourni par l’utilisateur).
+- [x] Vérifier le fichier DAD00036678 : 230 conteneurs, 117 B/L, 52 candidats pia=Y, 178 ignorés ; aucun accepté pour le poste LCT.
+- [x] 37 tests réussis et compilation backend validée ; motif explicite si code terminal inconnu.
+- [ ] Recharger l’aperçu puis valider l’import côté Togo Terminal ; pays final toujours contrôlé contre le registre.
+
+## Délai import 406 conteneurs — 16/09/2026
+
+- [x] Lecture groupée du registre ; création groupée des conteneurs, checkpoints et mouvements, par paquets de 500 dans une seule transaction Serializable.
+- [x] Messages lisibles pour expiration et conflits Prisma, sans exposer la trace interne.
+- [x] Recette PostgreSQL isolée : création et réimport de 406 références, sans doublons (385 ms localement), rollback sur conflit ; données de test nettoyées.
+- [ ] Refaire l’import utilisateur pour confirmer la durée sur la base applicative distante.
+
+## Blocage Safari confirmé — 16/09/2026
+
+- [x] Inspection de la page réelle : bouton « Importer 406 lignes » désactivé malgré une date affichée par le contrôle natif.
+- [x] Remplacer le contrôle datetime-local par une saisie explicite JJ/MM/AAAA HH:mm ; clic autorisé même si date vide, avec validation et erreur avant tout envoi.
+- [x] Trois tests de conversion réussis et compilation web validée.
+- [ ] Confirmer l’import réel avec l’opérateur ; aucune écriture d’import réalisée pendant ce diagnostic.
+
+## Retour visible du bouton Importer — 16/09/2026
+
+- [x] Afficher progression, erreur et succès au-dessus de l'aperçu, au lieu de sous les 200 lignes.
+- [x] Accepter la date du navigateur avec ou sans secondes ; valider date réelle et absence de futur avant envoi.
+- [x] Tests de conversion (2 scénarios) et compilation web réussis.
+- [ ] Vérifier le clic de l'utilisateur et le message obtenu ; aucun import réel relancé pendant ce correctif.
+
+
+## Règle XML révisée — 16/09/2026 (remplace Y/Y)
+
+- [x] Retenir pia=Y indépendamment de transit.
+- [x] Vérifier le pays final du registre PIA à l'aperçu et à l'import ; exclure Togo confirmé.
+- [x] Conserver les pays inconnus « À confirmer » ; afficher les mentions de pays de la description uniquement comme suggestions non enregistrées.
+- [x] Vérifier le fichier réel : 406 candidats sur 1515 ; 36 tests de services, recette API/PostgreSQL et compilations réussis.
+- [ ] Recette visuelle et confirmation des destinations inconnues par les opérateurs.
+
+
+## Manifeste XML PAL — 16/09/2026
+
+- [x] Lire UTF-8/ISO-8859-1 et retenir strictement transit=Y ET pia=Y sur principal-mani.
+- [x] Extraire tous les équipements d'un B/L ; conserver B/L, ATP, navire, terminal et marchandise ; ne pas confondre port Lomé et pays final.
+- [x] Aperçu XML avec compteurs, motifs d'exclusion et bouton de changement de fichier ; zéro éligible = aucune écriture, même par appel direct à l'import.
+- [x] Confirmer une date réelle VAQ pour les lignes retenues, sans utiliser ETA ou date de notification ; import transactionnel et contrôles de réimport.
+- [x] Tests unitaires (33 au total), compilations et recette API/PostgreSQL : exemplaire réel 1515/0, XML synthétique Y/Y accepté et réimport sans doublon.
+- [ ] Recette visuelle de la page avec l'utilisateur.
+- [ ] Examiner les 9 alertes de dépendances signalées par npm (3 modérées, 6 élevées), sans mise à niveau automatique forcée.
+
+
+## Recette PostgreSQL réalisée — 15/09/2026
+
+- [x] Créer PostgreSQL 17 isolé dans Docker et installer le schéma de recette.
+- [x] Vérifier réellement : réimport identique, B/L/dates/updatedAt conservés, absence de doublons, rollback d'un lot en conflit.
+- [x] Vérifier après nettoyage : zéro conteneur, checkpoint, mouvement, utilisateur, import et rapport de recette.
+- [ ] Tester les accès concurrents et le parcours complet via l'interface (non couverts par cette recette du service).
+
+
+## Recette PostgreSQL isolée — 15/09/2026
+
+- [x] Préparer `npm run test:official-db` : base locale dédiée obligatoire, distincte de DATABASE_URL, nettoyage limité aux références de cette exécution.
+- [x] Compiler le script et vérifier le refus de démarrage sans TEST_DATABASE_URL.
+- [ ] Démarrer PostgreSQL de recette, installer le schéma et exécuter la recette réelle. Docker est arrêté, TEST_DATABASE_URL absent.
+
+
+## Vérification des réimports — 15/09/2026
+
+- [x] Ne pas mettre à jour les conteneurs inchangés (préserver updatedAt, B/L et provenance).
+- [x] Afficher un bilan : créés, complétés, inchangés et opérations ajoutées.
+- [x] Tester le service complet avec fichiers synthétiques et transaction simulée : réimport identique, complément, conflit et périmètre terminal.
+- [ ] Valider ces scénarios sur une base PostgreSQL de recette ; les simulations ne vérifient pas le moteur ni les accès concurrents.
+
+
+## Modèle officiel PIA/Port confirmé — 15/09/2026
+
+- [x] Accepter le fichier de suivi fourni comme liste officielle importable, sans B/L obligatoire.
+- [x] Import transactionnel : compléter les dates manquantes, conserver les opérations, bloquer les conflits, ne supprimer aucune référence absente.
+- [x] Limiter le manifeste plat à l'enrichissement des conteneurs déjà présents, sans création hors registre ni remplacement des opérations.
+- [x] Vue à quai : afficher le total « Destinés PIA — registre complet » sans dépendre d'une date prévisionnelle.
+- [x] Tester les fusions de dates, conflits et dates futures ; compiler backend/web.
+- [ ] Recette en base : réimporter le modèle officiel et vérifier l'absence de nouveaux checkpoints sur un import identique.
+- [ ] Adapter les anciens tests de parcours qui créaient leurs conteneurs directement depuis un manifeste plat.
+- [ ] Harmoniser les autres compteurs prévisionnels et libellés avec le registre officiel.
+
+## Périmètre défini par la liste PIA — 15/09/2026
+
+- [x] Ajouter dans Mes manifestes une comparaison en lecture seule entre liste PIA et manifeste, par numéro de conteneur.
+- [x] Signaler les correspondances, absents, hors liste, doublons et terminaux incompatibles ; trois tests unitaires réussis.
+- [ ] Persister la liste PIA avec sa provenance, indépendamment des dates prévisionnelles.
+- [ ] Remplacer l'import direct par l'application du rapprochement, préserver les opérations existantes et conserver les attendus absents du manifeste.
+- [ ] Recalculer les indicateurs depuis le périmètre PIA et distinguer destinés, en route et réceptionnés.
+- [ ] Tester avec la liste PIA et le manifeste réels (format actuellement accepté : première feuille, en-têtes ligne 1).
+
+## Nouvelle directive PIA-TRACE - v3.4 (2026-09-11)
+
+- [x] Bloquer les validations répétées, les dates futures et les étapes inversées ; masquer les actions déjà réalisées sur la fiche (15/09/2026)
+
+- [x] Aligner la chronologie sur les quatre dates réelles ; supprimer les horaires fictifs et l'affectation terminal calculée depuis le B/L (15/09/2026)
+
+- [x] Retirer le contrôle documentaire de la fiche conteneur ; afficher uniquement sortie terminal, entrée PIA et sortie PIA en Oui/Non avec date (14/09/2026)
 
 ### Autonomie des terminaux - v3.2
 
@@ -33,9 +154,15 @@
 - [x] Migrer Prisma Postgres et regénérer les données de démonstration
 - [x] Mettre à jour la recette automatisée du parcours métier
 - [ ] Valider un exemple réel de manifeste PIA/GUCE et figer le modèle de colonnes
-- [ ] Ajouter l'aperçu et la validation des lignes avant l'import définitif
-- [ ] Ajouter un export Excel des listes quotidiennes et mensuelles
-- [ ] Définir les règles de rapprochement en cas de B/L multi-conteneurs
+- [x] Exclure de l'import les lignes dont le pays de destination est le Togo, avec motif visible dans l'aperçu
+- [ ] Adapter l'import au classeur réel PIA/LCT : feuilles multiples, en-têtes décalés, ATP par navire et dates des opérations
+- [x] Ajouter la consultation du suivi réel PIA/LCT en lecture seule, indépendante du manifeste source
+- [x] Vérifier 168 lignes détectées, 4 destinations Togo exclues et 113 destinations à confirmer sur le fichier reçu
+- [x] Remplacer sur demande les 1 644 conteneurs démo LCT par 164 lignes réelles, sauvegarder les anciennes données et reprendre 277 étapes historiques (14/09/2026)
+- [x] Ajouter l'aperçu et la validation des lignes avant l'import définitif
+- [x] Ajouter un export Excel des listes quotidiennes et mensuelles
+- [x] Définir les règles techniques provisoires de rapprochement en cas de B/L multi-conteneurs
+- [ ] Faire valider les règles B/L multi-conteneurs par les équipes métier
 - [ ] Valider avec LCT, Togo Terminal et PIA les champs réellement disponibles à chaque poste
 - [ ] Préparer les connecteurs officiels si des API partenaires sont accordées
 
@@ -194,9 +321,19 @@
 - [x] Phase 4 : 📈 Rapports & Statistiques
 - [x] Phase 5 : 🔔 Notifications applicatives web & Temps Réel
 - [ ] Notifications push natives Expo pour le mobile
-- [ ] Phase 6 : 🧪 Tests & Qualité (démarrée : 8 tests automatisés passent)
+- [ ] Phase 6 : 🧪 Tests & Qualité (démarrée : 12 tests automatisés passent)
 - [x] Vérifier manuellement les six connexions et l'interface de chaque rôle
 - [x] Vérifier les refus d'accès croisés LCT / Togo Terminal
 - [x] Automatiser un scénario d'écriture complet Consignataire → Togo Terminal → PIA → Livraison
 - [x] Nettoyer automatiquement le conteneur, les mouvements, checkpoints et notifications de recette
 - [ ] Phase 7 : 🚀 Déploiement & Documentation
+- [x] Ajouter un guide racine de démarrage, recette et mise en production
+- [x] Ajouter le contrôle GitHub automatique des tests backend et de la compilation web
+- [ ] Choisir l’hébergement de production, le domaine et la stratégie de sauvegarde
+# Historique opérationnel — 15/09/2026
+
+- [x] Choisir une date passée et une période jour/semaine/mois dans Vue à quai et Statistiques.
+- [x] Appliquer la même période aux exports Excel de ces deux écrans.
+- [x] Distinguer les flux historiques du stock actuellement présent à la PIA.
+- [x] Tester les limites calendaires et le refus des dates impossibles (4 tests).
+- [ ] Recette visuelle : sélectionner août 2026 dans Vue à quai et Statistiques et vérifier l'export avec les données LCT réelles.

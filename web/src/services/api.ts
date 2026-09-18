@@ -145,8 +145,10 @@ export interface CreateCheckpointRequest {
 }
 
 export type OperationPeriod = 'jour' | 'semaine' | 'mois';
+export type OperationExportKind = 'activite' | 'attendus' | 'quai' | 'sorties-terminal' | 'entrees-pia' | 'sorties-pia' | 'registre-pia' | 'flux-pia' | 'sejours-pia';
 
 export interface OperationStats {
+  destinesPia: number;
   attendus: number;
   attendusLct: number;
   attendusTogo: number;
@@ -161,6 +163,7 @@ export interface OperationStats {
 }
 
 export interface ManifesteImport {
+  bilan?: { crees: number; completes: number; inchanges: number; operationsAjoutees: number };
   id: number;
   nomFichier: string;
   source: string;
@@ -169,6 +172,54 @@ export interface ManifesteImport {
   lignesIgnorees: number;
   importedAt: string;
   importePar?: { nom: string; prenom: string };
+}
+
+export interface ManifestePreviewRow {
+  suggestionsPays?: string[];
+  sourceDestination?: string;
+  sheet?: string;
+  navire?: string;
+  dateSortieTerminal?: string | null;
+  dateEntreePia?: string | null;
+  dateSortiePia?: string | null;
+  statut?: string;
+  previsionTransfert?: string | null;
+  declaration?: string | null;
+  depote?: string | null;
+  line: number;
+  numeroConteneur: string | null;
+  numeroBL: string | null;
+  atp: string | null;
+  terminal: 'LCT' | 'TOGO' | null;
+  datePrevuePia: string | null;
+  dateDebarquement: string | null;
+  paysDestination: string | null;
+  typeMarchandise: string | null;
+  action: 'CREATION' | 'MISE_A_JOUR' | 'IGNOREE' | 'ANALYSE';
+  issues: string[];
+}
+
+export interface ManifestePreview {
+  xml?: boolean;
+  message?: string;
+  blTotal?: number;
+  combinations?: Record<string, number>;
+  lectureSeule?: boolean;
+  officiel?: boolean;
+  typeDocument?: 'SUIVI_TRANSFERT';
+  exclusionsTogo?: number;
+  destinationsAConfirmer?: number;
+  feuilles?: { nom: string; lignes: number; entete: number }[];
+  nomFichier: string;
+  lignesTotal: number;
+  lignesValides: number;
+  lignesIgnorees: number;
+  creations: number;
+  misesAJour: number;
+  colonnesReconnues: string[];
+  colonnesManquantes: string[];
+  lignes: ManifestePreviewRow[];
+  apercuLimite: boolean;
 }
 
 // Auth
@@ -202,20 +253,40 @@ export const conteneurService = {
 
 export const manifesteService = {
   getAll: () => api.get<{ manifestes: ManifesteImport[] }>('/manifestes'),
-  import: (fichier: File) => {
+  preview: (fichier: File) => {
     const form = new FormData();
     form.append('fichier', fichier);
+    return api.post<{ preview: ManifestePreview }>('/manifestes/preview', form, {
+      headers: { 'Content-Type': undefined },
+    });
+  },
+  import: (fichier: File, dateVaq?: string) => {
+    const form = new FormData();
+    form.append('fichier', fichier);
+    if (dateVaq) form.append('dateVaq', dateVaq);
     return api.post<{ manifeste: ManifesteImport }>('/manifestes/import', form, {
       headers: { 'Content-Type': undefined },
+      timeout: 150000,
     });
   },
 };
 
 export const operationService = {
-  getExpected: (periode: OperationPeriod) => api.get<{ conteneurs: Conteneur[] }>('/operations/attendus', { params: { periode } }),
-  getQuay: (periode: OperationPeriod) => api.get<{ conteneurs: Conteneur[] }>('/operations/quai', { params: { periode } }),
+  getExpected: (periode: OperationPeriod, date?: string) => api.get<{ conteneurs: Conteneur[] }>('/operations/attendus', { params: { periode, date } }),
+  getQuay: (periode: OperationPeriod, date?: string) => api.get<{ conteneurs: Conteneur[] }>('/operations/quai', { params: { periode, date } }),
   getPia: () => api.get<{ conteneurs: Conteneur[]; stats: { attendus: number; attendusLct: number; attendusTogo: number; enSejour: number; sortis: number; sejourMoyenHeures: number } }>('/operations/pia'),
-  getStats: (periode: OperationPeriod) => api.get<{ stats: OperationStats }>('/operations/stats', { params: { periode } }),
+  getStats: (periode: OperationPeriod, date?: string) => api.get<{ stats: OperationStats }>('/operations/stats', { params: { periode, date } }),
+  exportExcel: async (liste: OperationExportKind, periode: OperationPeriod, date?: string) => {
+    const response = await api.get<Blob>('/operations/export.xlsx', { params: { liste, periode, date }, responseType: 'blob' });
+    const disposition = String(response.headers['content-disposition'] ?? '');
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? `pia-trace-${liste}-${periode}.xlsx`;
+    const url = URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 // Users
