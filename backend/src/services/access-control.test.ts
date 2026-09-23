@@ -4,6 +4,12 @@ import { canAccessContainer, checkpointTypeForRole } from './access-control';
 
 const baseContainer = { clientId: 20, consignataireId: 7, terminalAffecte: 'LCT', statut: 'AU_TERMINAL' };
 
+test('admin et logisticien conservent les opérations des deux terminaux', () => {
+  for (const role of ['ADMIN', 'LOGISTICIEN']) for (const terminalAffecte of ['LCT', 'TOGO']) {
+    assert.equal(canAccessContainer({ id: 1, email: 'test@example.invalid', role, consignataireId: null }, { ...baseContainer, terminalAffecte }), true);
+  }
+});
+
 test('les anciens rôles externes ne voient plus les conteneurs', () => {
   assert.equal(canAccessContainer({ id: 2, email: 'c@pia.tg', role: 'CONSIGNATAIRE', consignataireId: 7 }, baseContainer), false);
   assert.equal(canAccessContainer({ id: 20, email: 'x@pia.tg', role: 'CLIENT', consignataireId: null }, baseContainer), false);

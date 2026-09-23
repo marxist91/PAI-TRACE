@@ -62,7 +62,15 @@ npm run build
 
 Une recette complète connectée à la base est disponible avec `npm run test:workflow` dans `backend/`. Elle crée ses données de test puis les supprime à la fin.
 
-### Recette isolée de l'import officiel PIA
+### Protection et administration sur PostgreSQL isolé
+
+Dans `backend/`, `npm run test:protection-db` et `npm run test:admin-db` exigent une variable `TEST_DATABASE_URL` vers une base PostgreSQL locale dédiée `pia_trace_test` (ou suffixée), distincte de `DATABASE_URL`. Installer les migrations sur cette base avant les tests. Ne jamais remplacer l’URL de l’application dans son fichier `.env`.
+
+La recette protection vérifie les parcours LCT/Togo, les droits, les dates, les doubles validations simultanées et les refus sans écriture. La recette administration vérifie les comptes, les sessions révoquées, les paramètres et le cycle ajout/désactivation/réactivation d’un pays, y compris le refus d’une sortie vers une destination inactive et la conservation de l’historique. Employer une base temporaire vide pour une exécution reproductible.
+
+Le workflow `.github/workflows/quality.yml` prépare un PostgreSQL 17 éphémère et exécute les deux recettes après tests et compilation. Aucun secret de la base applicative n’est nécessaire. Configuration préparée localement ; son exécution GitHub reste à confirmer après publication. Recette locale réussie le 23/09/2026 : 44 scénarios de protection et recette administration complète, nettoyage contrôlé.
+
+### Import officiel : recette isolée
 
 `npm run test:official-db` dans `backend/` vérifie le réimport identique et l'annulation complète d'un lot en conflit sur PostgreSQL. Elle exige `TEST_DATABASE_URL` vers une base locale dédiée nommée `pia_trace_test` (ou `pia_trace_test_suffixe`), différente de la base applicative. Le schéma Prisma doit déjà y être installé. Ne pas utiliser la base LCT réelle.
 

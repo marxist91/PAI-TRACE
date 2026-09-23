@@ -10,7 +10,7 @@ import {
   NavigationArrow,
   Truck,
 } from '@phosphor-icons/react';
-import { conteneurService } from '../services/api';
+import { conteneurService, settingsService } from '../services/api';
 import { StatusChip, statusLabel } from '../components/StatusChip';
 import { OpsHeader, OpsPage, OpsPanel, OpsState } from '../components/OperationsUI';
 import { useAuth } from '../contexts/AuthContext';
@@ -40,8 +40,8 @@ function formatDateTime(date: Date) {
 
 export default function ConteneurDetailPage() {
   const { user } = useAuth();
-  const isLogisticien = user?.role === 'LOGISTICIEN';
-  const canUpdate = Boolean(user && ['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA'].includes(user.role));
+  const isLogisticien = user?.role === 'LOGISTICIEN' || user?.role === 'ADMIN';
+  const canUpdate = Boolean(user && ['ADMIN', 'LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA'].includes(user.role));
   const roleCheckpointType = user?.role === 'CONTROLEUR_LCT' ? 'TERMINAL_LCT'
       : user?.role === 'CONTROLEUR_TOGO' ? 'TERMINAL_TOGO'
         : user?.role === 'AGENT_PIA' ? 'PIA' : 'TERMINAL_LCT';
@@ -85,6 +85,12 @@ export default function ConteneurDetailPage() {
         paysDestination: '',
       });
     },
+  });
+
+  const destinationCountries = useQuery({
+    queryKey: ['destination-countries'], queryFn: settingsService.getCountries,
+    refetchInterval: 30_000,
+    enabled: showCheckpointForm && checkpoint.type === 'PIA' && checkpoint.statut === 'SORTIE PIA',
   });
 
   const deleteMutation = useMutation({
@@ -152,7 +158,7 @@ export default function ConteneurDetailPage() {
                 <div className="ops-field"><label htmlFor="checkpointStatus">Action réalisée</label><select id="checkpointStatus" className="ops-select" value={checkpoint.statut} onChange={(event) => setCheckpoint({ ...checkpoint, statut: event.target.value })} required><option value="">Sélectionner l’action</option>{checkpoint.type.startsWith('TERMINAL_') && canExitTerminal && <option value="SORTIE TERMINAL">Sortie du terminal</option>}{checkpoint.type === 'PIA' && <>{canEnterPia && <option value="ENTREE PIA">Entrée à la PIA</option>}{canExitPia && <option value="SORTIE PIA">Sortie de la PIA</option>}</>}</select></div>
                 <div className="ops-field"><label htmlFor="checkpointDate">Date et heure</label><input id="checkpointDate" type="datetime-local" className="ops-input" value={checkpoint.date} onChange={(event) => setCheckpoint({ ...checkpoint, date: event.target.value })} required /></div>
                 <div className="ops-field"><label htmlFor="checkpointPlace">Lieu</label><input id="checkpointPlace" className="ops-input" value={checkpoint.lieu} onChange={(event) => setCheckpoint({ ...checkpoint, lieu: event.target.value })} required readOnly={!isLogisticien} /></div>
-                {checkpoint.type === 'PIA' && checkpoint.statut === 'SORTIE PIA' && <div className="ops-field ops-field-wide"><label htmlFor="checkpointCountry">Pays de destination</label><input id="checkpointCountry" className="ops-input" value={checkpoint.paysDestination} onChange={(event) => setCheckpoint({ ...checkpoint, paysDestination: event.target.value })} required /></div>}
+                {checkpoint.type === 'PIA' && checkpoint.statut === 'SORTIE PIA' && <div className="ops-field ops-field-wide"><label htmlFor="checkpointCountry">Pays de destination</label><select id="checkpointCountry" className="ops-select" value={checkpoint.paysDestination} onChange={(event) => setCheckpoint({ ...checkpoint, paysDestination: event.target.value })} required aria-describedby="countryHelp"><option value="">{destinationCountries.isLoading ? 'Chargement des pays…' : 'Choisir le pays de destination'}</option>{destinationCountries.data?.data.countries.map(country => <option key={country} value={country}>{country}</option>)}</select><small id="countryHelp">Pays absent ? Demandez son ajout à l’administrateur.</small>{destinationCountries.isError && <><p role="alert">Impossible de charger les pays.</p><button className="ops-button" type="button" disabled={destinationCountries.isFetching} onClick={() => void destinationCountries.refetch()}>Réessayer</button></>}</div>}
                 <div className="ops-field ops-field-wide"><label htmlFor="checkpointNotes">Notes</label><textarea id="checkpointNotes" className="ops-textarea" value={checkpoint.notes} onChange={(event) => setCheckpoint({ ...checkpoint, notes: event.target.value })} /></div>
               </div>
               <div className="ops-form-actions"><button type="button" className="ops-button" onClick={() => setShowCheckpointForm(false)}>Annuler</button><button type="submit" className="ops-button ops-button-primary" disabled={addCheckpointMutation.isPending}>{addCheckpointMutation.isPending ? 'Enregistrement...' : 'Valider le checkpoint'}</button></div>

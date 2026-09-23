@@ -1,5 +1,164 @@
 # ✅ TODO — Projet PIA
 
+## Recette de protection et automatisation — 23/09/2026
+
+- [x] Base PostgreSQL 17 temporaire indépendante : les 12 migrations s’appliquent depuis une base vide.
+- [x] 44 scénarios de protection API/base : parcours LCT/Togo, rôles, dates, concurrence et notifications.
+- [x] Recette administration étendue aux pays : droits, doublons, Togo, désactivation, refus sans écriture, réactivation, historique conservé.
+- [x] Nettoyage vérifié : aucun utilisateur, conteneur, checkpoint, notification ni paramètre de recette restant.
+- [x] Workflow GitHub enrichi avec PostgreSQL éphémère et recettes protection/admin.
+- [ ] Commit/push autorisé puis vérifier l’exécution du workflow sur GitHub ; aucune publication effectuée dans cette étape.
+
+## Désactivation des destinations et pilotage — 23/09/2026
+
+- [x] Recette utilisateur confirmée : ajout d’un pays depuis les paramètres, sélection et sortie PIA réussis.
+- [x] Boutons ADMIN Désactiver/Réactiver, statut visible ; catalogue et historique conservés, filtre des destinations actives côté formulaire et serveur.
+- [x] Compteur Sorties PIA ajouté au pilotage pour jour/semaine/mois ; cinq indicateurs sur grand écran.
+- [x] 68 tests backend et 12 tests web réussis, compilations réussies.
+- [ ] Recette visuelle des boutons et du compteur avec session ADMIN (session inspectée : Agent PIA).
+
+## Pays de destination configurables — 23/09/2026
+
+- [x] Liste persistante initiale Burkina Faso, Mali, Niger ; migration additive appliquée et relue en base.
+- [x] Paramètres : présentation avec icônes et formulaire d’ajout réservé ADMIN, contrôle des doublons et des versions concurrentes.
+- [x] Sortie PIA : sélection obligatoire dans la liste, validation serveur et enregistrement du libellé configuré ; Togo et destinations inconnues refusés.
+- [x] Vérification navigateur avec Agent PIA : liste des trois pays chargée, aucune opération enregistrée.
+- [x] 67 tests backend, 12 tests web, compilations backend/web réussies.
+- [x] Recette admin confirmée par l’utilisateur : pays ajouté, proposé à la PIA et utilisé pour une sortie réussie.
+
+## Tri de l’export sorties terminal — 23/09/2026
+
+- [x] Trier les sorties terminal par date/heure de départ décroissante, indépendamment de la dernière mise à jour PIA.
+- [x] Départ identique : numéro de conteneur puis B/L ; dates absentes en fin de liste. Autres exports et données sources inchangés.
+- [x] Test de non-régression avec relecture XLSX : dates, égalités, absence de date, totaux et absence de mutation.
+
+## Filtre terminal et reprise du chargement — 23/09/2026
+
+- [x] Filtre Tous/LCT/Togo Terminal commun aux statistiques, au stock actuel et aux exports ; cumul avec les droits existants côté serveur.
+- [x] Noms des exports et périmètre du classeur précisent le terminal sélectionné.
+- [x] Boutons de nouvelle tentative indépendants pour statistiques et stock, conservant les filtres.
+- [x] 63 tests backend, 12 tests web, TypeScript backend et compilation web réussis ; git diff --check sans erreur.
+- [ ] Terminer la recette après reconnexion : retour à Tous, boutons Réessayer, téléchargement filtré et rendu Excel natif. Session navigateur expirée lors du dernier contrôle ; fichier téléchargé non retrouvé au chemin attendu.
+
+## Séjours PIA par terminal d’origine — 23/09/2026
+
+- [x] Tableau LCT/Togo Terminal : séjours mesurés, non mesurables, moyenne, médiane, minimum et maximum.
+- [x] Calcul commun aux indicateurs globaux ; cohortes limitées aux sorties PIA de période, sans moyenne de moyennes ni de médianes.
+- [x] Nouvelle feuille « Séjours par terminal » dans la synthèse Excel, durées numériques en heures.
+- [x] 61 tests backend, 12 tests web, compilations backend/web ; relecture XLSX vérifiée.
+- [ ] Rendu Excel natif à confirmer.
+
+## Évolution quotidienne du stock PIA — 23/09/2026
+
+- [x] Courbe du stock de fin de journée, détail journalier et alerte sur les écarts locaux.
+- [x] Journée en cours bornée à l’heure du calcul ; aucun point futur ; reconstruction par dates indépendante du statut.
+- [x] Synthèse Excel : stocks début/fin, écart, arrêté UTC et état de journée ajoutés aux mouvements quotidiens. Le bilan ne somme pas les stocks.
+- [x] 59 tests backend, 12 tests web, compilations backend/web ; bornes à minuit, erreurs compensées et relecture XLSX vérifiées.
+- [x] Navigateur : courbe semaine (2, 12, 12), détail sans écart ; courbe mensuelle vérifiée à 390 px, aucun point après le 23/09.
+- [ ] Rendu des nouvelles colonnes dans Excel natif à confirmer.
+
+## Statistiques par pays de destination — 22/09/2026
+
+- [x] Entrées, sorties, part des sorties, couverture des durées et séjour moyen terminé par pays actuel du registre.
+- [x] Pays absents regroupés en « À confirmer », variantes de casse/espaces normalisées, aucune destination déduite de la marchandise.
+- [x] Onglet Destinations ajouté à la synthèse Excel, totaux et moyenne globale pondérée identiques à l’écran.
+- [x] 57 tests backend, 12 tests web, compilations backend/web ; contrôle navigateur semaine/mois et tableau défilant à 390 px.
+- [ ] Rendu de l’onglet Destinations dans Excel natif à confirmer.
+
+## Clôture des parcours historiques de test — 22/09/2026
+
+- [x] Périmètre confirmé : date Vu à quai en juillet/août 2026. 0 en juillet, 88 en août (LCT).
+- [x] 53 parcours complétés, 35 déjà complets conservés ; ajout de 8 sorties terminal, 8 entrées PIA et 53 sorties PIA.
+- [x] Sauvegarde privée préalable, transaction atomique, conservation des dates/destinations et contrôle des conteneurs hors périmètre.
+- [x] Étapes générées annotées SIMULATION / TEST dans checkpoints/mouvements, rapport MAINTENANCE_TEST ; aucune suppression ni notification de fausse opération réelle.
+- [ ] Les statistiques incluent encore ces dates synthétiques : ne pas les présenter comme performances réelles.
+
+## Stock actuel et séjours prolongés — 22/09/2026
+
+- [x] Bloc autonome du filtre historique, actualisé chaque minute et après les opérations.
+- [x] Ancienneté, liste triée du plus ancien au plus récent, liens vers les fiches et seuils ENTRE_PIA configurés.
+- [x] Filtres tous/alertes avec critiques/critiques seuls et export Excel du stock filtré avec date d’arrêté.
+- [x] 55 tests backend, 12 tests web, compilations backend/web ; contrôle bureau : 45 présents et 45 critiques, seuils 72/120 h.
+- [x] Export critique téléchargé et relu : 45 lignes, sans doublon, ordre décroissant des séjours.
+- [ ] Contrôle mobile et rendu Excel natif.
+
+## Répartition des séjours — 22/09/2026
+
+- [x] Quatre tranches descriptives : [0,24 h], ]24,72 h], ]72,168 h], plus de 168 h ; aucune modification des seuils d’alerte.
+- [x] Graphique des séjours terminés mesurables et quatre lignes ajoutées à la synthèse Excel ; période et exclusions identiques aux durées.
+- [x] Tests aux bornes et une minute après chaque borne, total sans doublons, absence de mesures et relecture XLSX ; 52 tests backend, 12 tests web, compilations réussies.
+
+## Durées des séjours terminés — 22/09/2026
+
+- [x] Médiane, minimum, maximum, nombre mesuré et non mesurable dans Statistiques et Synthèse Excel.
+- [x] Population limitée aux sorties PIA de la période ; durée complète depuis l’entrée, séjours en cours exclus.
+- [x] Absence de durée valide : moyenne et extrêmes indisponibles, pas de faux zéro ; aucune suppression des données de test.
+- [x] 51 tests backend, 12 tests web et compilations backend/web réussis ; médianes paires/impaires et bornes testées.
+- [ ] Rendu du nouvel export à vérifier dans Excel.
+
+## Délai terminal → PIA — 21/09/2026
+
+- [x] Moyenne par terminal et globale pondérée ; cohorte des entrées PIA dans la période, départ antérieur admis.
+- [x] Comptages mesurés/non mesurables ; dates manquantes ou inversées exclues, absence de mesure distincte de zéro.
+- [x] Tableau Statistiques et synthèse Excel enrichis sans modifier les exports opérationnels ni la base.
+- [x] 49 tests backend, 12 tests web, TypeScript backend et build web réussis.
+- [x] Navigateur bureau : semaine sans entrée affiche « Non disponible » ; mois de septembre affiche 16 transferts mesurés (9 LCT, 7 Togo), zéro non mesurable.
+- [ ] Contrôle visuel mobile et rendu du nouvel export dans Excel.
+
+## Export de synthèse statistique — 21/09/2026
+
+- [x] Bouton distinct des exports opérationnels, période sélectionnée et périmètre du rôle conservés.
+- [x] Trois feuilles : Synthèse, Mouvements quotidiens, Terminaux ; stocks historique/actuel distingués, génération horodatée.
+- [x] Calcul partagé avec l’API Statistiques ; 47 tests de services backend réussis, compilation backend/web validée.
+- [ ] Vérification du rendu dans Excel par l’utilisateur.
+
+## Statistiques enrichies — 21/09/2026
+
+- [x] Stock initial/final reconstitué par dates et rapprochement stock initial + entrées − sorties ; écart explicite en cas de données incohérentes.
+- [x] Graphique quotidien avec jours sans mouvement ; période en cours arrêtée à maintenant, sans jours futurs artificiellement à zéro.
+- [x] Comparaison LCT/Togo : sorties terminal, entrées et sorties PIA, tableau des volumes exacts ; dates propres à chaque étape.
+- [x] 45 tests de services backend et 12 tests web réussis ; TypeScript backend et build web validés.
+- [x] Contrôle navigateur connecté semaine du 14/09 : 46 + 16 − 2 = 60, stock actuel distinct de 47 ; graphiques visibles, LCT 8/9/1 et Togo 7/7/1.
+- [ ] Contrôle visuel mobile et intégration de ces nouveaux indicateurs dans un export statistique dédié (exports des opérations inchangés).
+
+## Export PIA historique — 21/09/2026
+
+- [x] Exports flux/entrées/sorties PIA : dates limitées à la période et au type choisi, libellé des opérations au lieu du statut actuel, totaux distincts.
+- [x] Séjour terminé affiché seulement pour les sorties sélectionnées, durée réelle conservée même si l’entrée précède la période ; export Séjours inchangé.
+- [x] Tests XLSX après sauvegarde/relecture : semaines et mois, borne de fin exclue, entrée antérieure, sortie ultérieure et absence de mutation des données sources ; compilation backend réussie.
+- [ ] Régénérer l’export réel du 14 au 20 septembre pour confirmer les 16 entrées et 2 sorties ; anciens fichiers inchangés.
+
+## Filtres des opérations et distinction VAQ — 21/09/2026
+
+- [x] Jour/semaine/mois avec date au choix : sorties terminal et entrées/sorties PIA, indépendamment du statut actuel.
+- [x] Compteur VAQ calculé sur la date de débarquement du registre, séparément de la date de sortie ; colonne Sortie terminal et message de période vide corrigés.
+- [x] Registre PIA : préciser que le séjour moyen concerne tout l’historique et afficher le stock actuel.
+- [x] 12 tests web et compilation réussis. Navigateur connecté : le 18/09 affiche 6 sorties LCT et 6 Togo Terminal, même après sortie PIA.
+- [ ] Terminer la comparaison visuelle semaines/mois et exports, puis préparer commit/push des modifications en attente.
+
+## Historique des étapes dans Conteneurs — 18/09/2026
+
+- [x] Filtrer les étapes réalisées par leur date enregistrée, pas par le seul statut courant : une sortie terminal reste visible après entrée/sortie PIA.
+- [x] Conserver recherche, périmètre serveur par rôle, tri et export de la liste filtrée ; préciser « toutes dates » dans la vue.
+- [x] Quatre tests de filtre, dont six sorties déjà entrées à la PIA ; sept tests web réussis au total.
+
+## Séparation Admin / Logisticien — 18/09/2026
+
+- [x] Nouveau rôle ADMIN : tous les droits ; LOGISTICIEN conserve les opérations, sans utilisateurs ni paramètres (menus, routes web et API).
+- [x] Préserver les droits administratifs des anciens LOGISTICIEN en les migrant vers ADMIN, sessions révoquées et reconnexion nécessaire. Les futures attributions LOGISTICIEN restent sans administration.
+- [x] Minimum mot de passe 8 caractères ; œil afficher/masquer dans les comptes et la connexion.
+- [x] Paramètres : récapitulatif avec icônes et cartes, bouton Modifier, retour au récapitulatif après sauvegarde.
+- [x] Recette isolée Admin/Logisticien réussie : refus de lecture/écriture administrative et inscription pour logisticien, opérations conservées, 7 caractères refusés et 8 acceptés. 43 tests backend et compilations réussis.
+
+## Administration des comptes et paramètres — 18/09/2026
+
+- [x] Création/modification des comptes internes, choix du rôle, activation/désactivation et changement du mot de passe depuis Utilisateurs.
+- [x] Administration réservée aux logisticiens ; inscription publique fermée ; secrets absents des réponses ; contrôle des doublons et des modifications concurrentes.
+- [x] Révocation des sessions HTTP/refresh et déconnexion temps réel lors des changements sensibles ; protection contre le retrait de son propre accès administrateur et du dernier administrateur actif.
+- [x] Paramètres : quatre seuils d’alerte/critique persistants, appliqués au calcul des anomalies ; validations et version pour éviter les écrasements.
+- [x] Migration appliquée à la base applicative sans suppression de données. Tests administrateur sur PostgreSQL isolé, 44 scénarios parcours et 42 tests backend réussis ; compilations backend/web validées.
+- [ ] Recette visuelle connectée : créer un agent, modifier son rôle puis tester l’enregistrement des seuils (navigateur de vérification non connecté).
+
 ## Tests de protection — 18/09/2026
 
 - [x] Ajouter `backend/scripts/test-protection-db.ts` et `npm run test:protection-db` : PostgreSQL local de recette obligatoire, différent de la base applicative.
@@ -7,7 +166,7 @@
 - [x] Vérifier chaque refus sans modification du conteneur ni création d'historique ou notification ; contrôler les destinataires après chaque succès.
 - [x] Nettoyer les comptes, conteneurs et événements temporaires ; aucune opération sur les données réelles.
 - [x] Suite backend : 42 tests réussis ; compilation TypeScript backend réussie.
-- [ ] Brancher cette recette sur PostgreSQL éphémère dans le contrôle automatique GitHub.
+- [x] Brancher cette recette sur PostgreSQL éphémère dans le contrôle automatique GitHub (configuration locale du 23/09 ; exécution distante après publication).
 
 ## Statistiques et exports PIA — 17/09/2026
 

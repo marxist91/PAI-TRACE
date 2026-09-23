@@ -2475,11 +2475,12 @@ body {
 .login-command-card h2 { margin: 18px 0 0; color: #f5f7fb; font-size: 25px; letter-spacing: -.035em; }
 .login-command-card > p { margin: 8px 0 24px; color: #8397b5; font-size: 10px; }
 .login-command-card form { display: grid; gap: 14px; }
-.login-command-card form .ops-button { width: 100%; margin-top: 4px; }
+.login-command-card form > .ops-button { width: 100%; margin-top: 4px; }
 .login-error { margin-bottom: 14px; border: 1px solid rgba(255, 103, 111, .5); background: rgba(255, 103, 111, .08); padding: 10px; color: #ff9da3; font-size: 9px; }
 
 @media (min-width: 760px) {
   .ops-metric-strip { grid-template-columns: repeat(4, 1fr); }
+  .ops-pilotage-metrics .ops-metric-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .ops-metric,
   .ops-metric:nth-child(even) { border-right: 1px solid #3c4e70; border-bottom: 0; }
   .ops-metric:last-child { border-right: 0; }
@@ -3051,3 +3052,19 @@ html[data-api-state="offline"] .live-offline {
     min-height: 360px;
   }
 }
+/* Administration: forms inherit the operational palette. */
+.admin-form { padding: 20px; }
+.admin-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.admin-form-grid label { display: flex; flex-direction: column; gap: 8px; }
+.admin-form .ops-input { width: 100%; }
+.admin-form p { margin: 16px 0; }
+.admin-form small { opacity: .75; }
+.admin-form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.admin-error { color: #ff8996; }
+.admin-password { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: stretch; gap: 8px; margin: 8px 0; }
+.admin-password .ops-input { min-width: 0; width: 100%; }
+.admin-password > .ops-button { width: 44px; min-width: 44px; padding: 0; margin: 0; }
+.admin-save-success { display: flex; align-items: center; gap: 10px; color: #4cde9c; }
+.ops-settings-list b small { display: block; margin-top: 5px; font-size: 12px; font-weight: 400; }
+@media (max-width: 700px) { .admin-form-grid { grid-template-columns: 1fr; } }

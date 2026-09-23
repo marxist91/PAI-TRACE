@@ -8,6 +8,7 @@ import {
   revokeRefreshToken,
   verifyRefreshToken,
   authenticate,
+  requireRole,
   AuthRequest,
 } from '../middleware/auth';
 
@@ -16,11 +17,11 @@ const router = Router();
 // Schémas de validation
 const registerSchema = z.object({
   email: z.string().email('Email invalide'),
-  password: z.string().min(6, 'Mot de passe minimum 6 caractères'),
+  password: z.string().min(8, 'Mot de passe minimum 8 caractères').max(72),
   nom: z.string().min(1, 'Nom requis'),
   prenom: z.string().min(1, 'Prénom requis'),
   telephone: z.string().optional(),
-  role: z.enum(['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA']).default('LOGISTICIEN'),
+  role: z.enum(['ADMIN', 'LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA']).default('LOGISTICIEN'),
 });
 
 const loginSchema = z.object({
@@ -32,7 +33,7 @@ const refreshSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token requis'),
 });
 
-const ACTIVE_ROLES = ['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA'];
+const ACTIVE_ROLES = ['ADMIN', 'LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA'];
 
 function isDatabaseUnavailable(error: unknown): error is { code: string } {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P1001';
@@ -49,7 +50,7 @@ async function withDatabaseRetry<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 // POST /api/auth/register
-router.post('/register', async (req: Request, res: Response): Promise<void> => {
+router.post('/register', authenticate, requireRole('ADMIN'), async (req: Request, res: Response): Promise<void> => {
   try {
     const data = registerSchema.parse(req.body);
 
@@ -105,7 +106,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     // Trouver l'utilisateur
     const user = await withDatabaseRetry(() => prisma.user.findUnique({ where: { email: data.email } }));
-    if (!user) {
+    if (!user || !user.isActive) {
       res.status(401).json({ error: 'Email ou mot de passe incorrect' });
       return;
     }
@@ -121,7 +122,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const accessToken = generateAccessToken({ id: user.id, email: user.email, role: user.role });
+    const accessToken = generateAccessToken(user);
     const refreshToken = await createRefreshToken(user.id);
 
     res.json({
@@ -158,10 +159,10 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
 
     const storedToken = await prisma.refreshToken.findUnique({
       where: { token: refreshToken },
-      include: { user: { select: { id: true, email: true, role: true } } },
+      include: { user: { select: { id: true, email: true, role: true, isActive: true, tokenVersion: true } } },
     });
 
-    if (!storedToken || storedToken.expiresAt < new Date()) {
+    if (!storedToken || !storedToken.user.isActive || storedToken.expiresAt < new Date()) {
       res.status(401).json({ error: 'Refresh token invalide ou expiré' });
       return;
     }
@@ -173,7 +174,10 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
     }
 
     // Vérifier la signature du refresh token
-    verifyRefreshToken(refreshToken);
+    const decoded = verifyRefreshToken(refreshToken);
+    if ((decoded.tokenVersion ?? 0) !== storedToken.user.tokenVersion) {
+      res.status(401).json({ error: 'Session révoquée. Reconnectez-vous.' }); return;
+    }
 
     // Générer un nouvel access token
     const accessToken = generateAccessToken(storedToken.user);

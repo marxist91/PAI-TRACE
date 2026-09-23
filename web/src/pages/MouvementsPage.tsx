@@ -26,6 +26,7 @@ const actionLabels: Record<string, string> = {
 
 const roleLabels: Record<string, string> = {
   LOGISTICIEN: 'Logisticien PAL',
+  ADMIN: 'Administrateur',
   CONTROLEUR_LCT: 'Agent LCT',
   CONTROLEUR_TOGO: 'Agent Togo Terminal',
   AGENT_PIA: 'Agent PIA',

@@ -70,8 +70,8 @@ async function main() {
   const password = await bcrypt.hash('password123', 10);
   const logisticien = await prisma.user.upsert({
     where: { email: 'logisticien@pia.tg' },
-    update: { password, nom: 'Opérations', prenom: 'Admin', role: 'LOGISTICIEN', consignataireId: null },
-    create: { email: 'logisticien@pia.tg', password, nom: 'Opérations', prenom: 'Admin', role: 'LOGISTICIEN' },
+    update: { password, nom: 'Opérations', prenom: 'Admin', role: 'ADMIN', consignataireId: null },
+    create: { email: 'logisticien@pia.tg', password, nom: 'Opérations', prenom: 'Admin', role: 'ADMIN' },
   });
   const accountDefinitions = [
     { email: 'controleur.lct@pia.tg', nom: 'LCT', prenom: 'Kossi', role: 'CONTROLEUR_LCT' as const, consignataireId: null },

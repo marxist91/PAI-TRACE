@@ -9,6 +9,7 @@ datasource db {
 
 // ─── Utilisateurs ───────────────────────────────────────────────────
 enum Role {
+  ADMIN
   LOGISTICIEN
   CONSIGNATAIRE
   CONTROLEUR_LCT
@@ -21,6 +22,8 @@ model User {
   id              Int            @id @default(autoincrement())
   email           String         @unique
   password        String // hashé avec bcrypt
+  isActive        Boolean        @default(true)
+  tokenVersion    Int            @default(0)
   nom             String
   prenom          String
   telephone       String?
@@ -48,6 +51,16 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model OperationalSettings {
+  id        Int      @id @default(1)
+  rules     Json
+  destinationCountries String[] @default(["Burkina Faso", "Mali", "Niger"])
+  disabledDestinationCountries String[] @default([])
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+  updatedBy Int
 }
 
 // ─── Consignataires (ex: Maersk, MSC, CMA CGM) ────────────────────

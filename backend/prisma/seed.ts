@@ -51,7 +51,7 @@ async function main() {
       password: hash,
       nom: "Logisticien",
       prenom: "Admin",
-      role: "LOGISTICIEN",
+      role: "ADMIN",
     },
   });
   const client = await prisma.user.upsert({

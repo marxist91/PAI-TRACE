@@ -62,6 +62,22 @@ export async function buildOperationsWorkbook(options: {
 }) {
   const workbook = new ExcelJS.Workbook();
   const generatedAt = new Date();
+  // Period exports describe operations, not the container's current journey.
+  const piaPeriod = ['flux-pia', 'entrees-pia', 'sorties-pia'].includes(options.kind);
+  const inPeriod = (value: Date | null) => value !== null && value >= options.start && value < options.end;
+  const includesEntry = (item: OperationExportRow) => options.kind !== 'sorties-pia' && inPeriod(item.dateEntreePia);
+  const includesExit = (item: OperationExportRow) => options.kind !== 'entrees-pia' && inPeriod(item.dateSortiePia);
+  const rows = piaPeriod ? options.rows.filter(item => includesEntry(item) || includesExit(item)) : [...options.rows];
+  if (options.kind === 'sorties-terminal') {
+    // A later PIA update must not move an older terminal departure to the top.
+    rows.sort((a, b) => {
+      if (!a.dateSortieTerminal && b.dateSortieTerminal) return 1;
+      if (a.dateSortieTerminal && !b.dateSortieTerminal) return -1;
+      const byDeparture = (b.dateSortieTerminal?.getTime() ?? 0) - (a.dateSortieTerminal?.getTime() ?? 0);
+      return byDeparture || (a.numeroConteneur ?? '').localeCompare(b.numeroConteneur ?? '')
+        || a.numeroBL.localeCompare(b.numeroBL);
+    });
+  }
   workbook.creator = 'PIA-TRACE';
   workbook.created = new Date();
   const sheet = workbook.addWorksheet('Liste opérationnelle', {
@@ -77,12 +93,12 @@ export async function buildOperationsWorkbook(options: {
   sheet.getRow(1).height = 34;
 
   sheet.mergeCells('A2:M2');
-  sheet.getCell('A2').value = `${options.scopeLabel} • ${options.periodLabel} • ${options.rows.length} conteneur${options.rows.length > 1 ? 's' : ''}`;
+  sheet.getCell('A2').value = `${options.scopeLabel} • ${options.periodLabel} • ${rows.length} conteneur${rows.length > 1 ? 's' : ''}` + (piaPeriod ? ` • ${rows.filter(includesEntry).length} entrées • ${rows.filter(includesExit).length} sorties` : '');
   sheet.getCell('A2').font = { bold: true, color: { argb: 'FF061A38' }, size: 11 };
   sheet.getCell('A2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4D80B' } };
 
   sheet.mergeCells('A3:M3');
-  sheet.getCell('A3').value = `Période : ${options.start.toLocaleString('fr-FR')} — ${options.end.toLocaleString('fr-FR')} (fin exclue)`;
+  sheet.getCell('A3').value = `Période : ${options.start.toLocaleString('fr-FR', { timeZone: 'UTC' })} — ${options.end.toLocaleString('fr-FR', { timeZone: 'UTC' })} (fin exclue, Lomé / UTC)`;
   sheet.getCell('A3').font = { italic: true, color: { argb: 'FF53657F' } };
 
   sheet.columns = [
@@ -95,6 +111,14 @@ export async function buildOperationsWorkbook(options: {
 
   const header = sheet.getRow(5);
   header.values = ['Conteneur', 'B/L', 'ATP', 'Terminal', 'Pays de destination', 'Marchandise', 'Statut', 'Prévu à la PIA', 'Vue à quai', 'Sortie terminal', 'Entrée PIA', 'Sortie PIA', 'Séjour (heures)'];
+  if (piaPeriod) {
+    sheet.getColumn(7).width = 30;
+    sheet.getCell('G5').value = 'Opérations de la période';
+    sheet.getCell('K5').value = 'Entrée PIA — période';
+    sheet.getCell('L5').value = 'Sortie PIA — période';
+    sheet.getCell('M5').value = 'Séjour terminé (heures)';
+    for (let column = 8; column <= 10; column += 1) sheet.getColumn(column).hidden = true;
+  }
   header.height = 30;
   header.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -102,19 +126,21 @@ export async function buildOperationsWorkbook(options: {
     cell.alignment = { vertical: 'middle', wrapText: true };
   });
 
-  for (const item of options.rows) {
+  for (const item of rows) {
     const end = item.dateSortiePia ?? generatedAt;
     const stayHours = item.dateEntreePia ? Math.max(0, (end.getTime() - item.dateEntreePia.getTime()) / 3_600_000) : null;
     const row = sheet.addRow({
       conteneur: item.numeroConteneur ?? '', bl: item.numeroBL, atp: item.atp ?? '',
       terminal: item.terminalAffecte === 'TOGO' ? 'Togo Terminal' : item.terminalAffecte ?? 'À préciser',
       pays: item.paysDestination ?? item.destination, marchandise: item.typeMarchandise,
-      statut: STATUS_LABELS[item.statut] ?? item.statut,
-      prevue: item.datePrevuePia, quai: item.dateDebarquement, sortieTerminal: item.dateSortieTerminal,
-      entreePia: item.dateEntreePia, sortiePia: item.dateSortiePia, sejour: stayHours,
+      statut: piaPeriod ? [includesEntry(item) ? 'Entrée PIA' : '', includesExit(item) ? 'Sortie PIA' : ''].filter(Boolean).join(' + ') : STATUS_LABELS[item.statut] ?? item.statut,
+      prevue: piaPeriod ? null : item.datePrevuePia, quai: piaPeriod ? null : item.dateDebarquement, sortieTerminal: piaPeriod ? null : item.dateSortieTerminal,
+      entreePia: !piaPeriod || includesEntry(item) ? item.dateEntreePia : null,
+      sortiePia: !piaPeriod || includesExit(item) ? item.dateSortiePia : null,
+      sejour: !piaPeriod || includesExit(item) ? stayHours : null,
     });
     row.eachCell((cell, column) => {
-      cell.alignment = { vertical: 'middle', wrapText: column === 6 };
+      cell.alignment = { vertical: 'middle', wrapText: column === 6 || (piaPeriod && column === 7) };
       cell.border = { bottom: { style: 'hair', color: { argb: 'FFD5DDEA' } } };
       if (row.number % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F7FB' } };
     });
@@ -123,7 +149,9 @@ export async function buildOperationsWorkbook(options: {
   for (let column = 8; column <= 12; column += 1) sheet.getColumn(column).numFmt = 'dd/mm/yyyy hh:mm';
   sheet.getColumn(13).numFmt = '0.00';
   sheet.mergeCells('A4:M4');
-  sheet.getCell('A4').value = `Séjour total entrée → sortie ; en cours arrêté au ${generatedAt.toLocaleString('fr-FR', { timeZone: 'UTC' })} UTC. 2,25 h = 2 h 15 min.`;
+  sheet.getCell('A4').value = piaPeriod
+    ? 'Dates hors période non affichées. Séjour total uniquement pour les sorties sélectionnées ; entrée antérieure incluse dans le calcul. 2,25 h = 2 h 15 min.'
+    : `Séjour total entrée → sortie ; en cours arrêté au ${generatedAt.toLocaleString('fr-FR', { timeZone: 'UTC' })} UTC. 2,25 h = 2 h 15 min.`;
   sheet.getCell('A4').font = { italic: true, size: 10 };
   sheet.autoFilter = { from: 'A5', to: `M${Math.max(5, sheet.rowCount)}` };
   sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };

@@ -20,6 +20,7 @@
     "test": "tsx --test src/**/*.test.ts",
     "test:workflow": "tsx scripts/test-full-workflow.ts",
     "test:protection-db": "node --import tsx scripts/test-protection-db.ts",
+    "test:admin-db": "node --import tsx scripts/test-admin-db.ts",
     "test:official-db": "node --import tsx scripts/test-official-pia-db.ts"
   },
   "keywords": [],

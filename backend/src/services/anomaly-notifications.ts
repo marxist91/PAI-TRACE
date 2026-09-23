@@ -12,7 +12,7 @@ export async function syncAnomalyNotifications(anomalies: ActiveAnomaly[]) {
   if (anomalies.length === 0) return [];
 
   const logisticians = await prisma.user.findMany({
-    where: { role: 'LOGISTICIEN' },
+    where: { role: { in: ['ADMIN', 'LOGISTICIEN'] }, isActive: true },
     select: { id: true },
   });
   if (logisticians.length === 0) return [];

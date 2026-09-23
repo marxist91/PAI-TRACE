@@ -48,7 +48,6 @@ const terminalNavItems: typeof navItems = [
   { path: '/checkpoints', label: 'Sorties terminal', icon: MapPin },
   { path: '/mouvements', label: 'Mouvements', icon: ArrowsLeftRight },
   { path: '/anomalies', label: 'Anomalies', icon: Warning },
-  { path: '/parametres', label: 'Mon compte', icon: Gear },
 ];
 
 const piaNavItems: typeof navItems = [
@@ -58,10 +57,10 @@ const piaNavItems: typeof navItems = [
   { path: '/checkpoints', label: 'Contrôles PIA', icon: MapPin },
   { path: '/mouvements', label: 'Mouvements', icon: ArrowsLeftRight },
   { path: '/anomalies', label: 'Anomalies', icon: Warning },
-  { path: '/parametres', label: 'Mon compte', icon: Gear },
 ];
 
 const roleLabels: Record<string, string> = {
+  ADMIN: 'Administrateur',
   LOGISTICIEN: 'Logisticien PAL',
   CONTROLEUR_LCT: 'Contrôleur LCT', CONTROLEUR_TOGO: 'Contrôleur Togo Terminal', AGENT_PIA: 'Agent PIA',
 };
@@ -122,8 +121,9 @@ export default function Layout() {
   }, [accessToken, queryClient]);
 
   const activeNavItems = user?.role === 'CONTROLEUR_LCT' || user?.role === 'CONTROLEUR_TOGO' ? terminalNavItems
-        : user?.role === 'AGENT_PIA' ? piaNavItems : navItems;
+        : user?.role === 'AGENT_PIA' ? piaNavItems : user?.role === 'ADMIN' ? navItems : navItems.filter(item => !['/parametres', '/utilisateurs'].includes(item.path));
   const homeTitles: Record<string, string> = {
+    ADMIN: 'Administration',
     LOGISTICIEN: 'Centre des opérations',
     CONTROLEUR_LCT: 'Poste LCT',
     CONTROLEUR_TOGO: 'Poste Togo Terminal',

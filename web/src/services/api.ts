@@ -22,7 +22,7 @@ export interface RegisterRequest {
   role: Role;
 }
 
-export type Role = 'LOGISTICIEN' | 'CONTROLEUR_LCT' | 'CONTROLEUR_TOGO' | 'AGENT_PIA' | 'CONSIGNATAIRE' | 'CLIENT';
+export type Role = 'ADMIN' | 'LOGISTICIEN' | 'CONTROLEUR_LCT' | 'CONTROLEUR_TOGO' | 'AGENT_PIA' | 'CONSIGNATAIRE' | 'CLIENT';
 
 export interface User {
   id: number;
@@ -37,6 +37,8 @@ export interface User {
 
 export interface UserSummary extends User {
   createdAt: string;
+  updatedAt: string;
+  isActive: boolean;
   _count: { conteneurs: number; mouvements: number };
 }
 
@@ -148,6 +150,17 @@ export type OperationPeriod = 'jour' | 'semaine' | 'mois';
 export type OperationExportKind = 'activite' | 'attendus' | 'quai' | 'sorties-terminal' | 'entrees-pia' | 'sorties-pia' | 'registre-pia' | 'flux-pia' | 'sejours-pia';
 
 export interface OperationStats {
+  byDestination: { pays: string; entreesPia: number; sortiesPia: number; partSorties: number | null; sejoursMesures: number; sejoursNonMesurables: number; sejourMoyenHeures: number | null }[];
+  stockDebut: number | null;
+  stockFin: number | null;
+  ecartStock: number | null;
+  periodeEnCours: boolean;
+  arreteAu: string;
+  daily: { date: string; entrees: number; sorties: number; stockDebut: number; stockFin: number; ecartStock: number; arreteAu: string; partiel: boolean }[];
+  transfertsMesures: number;
+  transfertsNonMesurables: number;
+  transfertMoyenHeures: number | null;
+  byTerminal: { terminal: string; sortiesTerminal: number; entreesPia: number; sortiesPia: number; transfertsMesures: number; transfertsNonMesurables: number; transfertMoyenHeures: number | null; sejoursMesures: number; sejoursNonMesurables: number; sejourMoyenHeures: number | null; sejourMedianHeures: number | null; sejourMinHeures: number | null; sejourMaxHeures: number | null }[];
   destinesPia: number;
   attendus: number;
   attendusLct: number;
@@ -159,7 +172,13 @@ export interface OperationStats {
   entreesPia: number;
   sortiesPia: number;
   enSejour: number;
-  sejourMoyenHeures: number;
+  sejourMoyenHeures: number | null;
+  sejoursMesures: number;
+  sejoursParDuree: { tranche: string; nombre: number }[];
+  sejoursNonMesurables: number;
+  sejourMedianHeures: number | null;
+  sejourMinHeures: number | null;
+  sejourMaxHeures: number | null;
 }
 
 export interface ManifesteImport {
@@ -272,12 +291,13 @@ export const manifesteService = {
 };
 
 export const operationService = {
+  getCurrentStock: (terminal: 'TOUS' | 'LCT' | 'TOGO' = 'TOUS') => api.get<{ stock: CurrentPiaStock }>('/operations/stock-actuel', { params: { terminal } }),
   getExpected: (periode: OperationPeriod, date?: string) => api.get<{ conteneurs: Conteneur[] }>('/operations/attendus', { params: { periode, date } }),
   getQuay: (periode: OperationPeriod, date?: string) => api.get<{ conteneurs: Conteneur[] }>('/operations/quai', { params: { periode, date } }),
   getPia: () => api.get<{ conteneurs: Conteneur[]; stats: { attendus: number; attendusLct: number; attendusTogo: number; enSejour: number; sortis: number; sejourMoyenHeures: number } }>('/operations/pia'),
-  getStats: (periode: OperationPeriod, date?: string) => api.get<{ stats: OperationStats }>('/operations/stats', { params: { periode, date } }),
-  exportExcel: async (liste: OperationExportKind, periode: OperationPeriod, date?: string) => {
-    const response = await api.get<Blob>('/operations/export.xlsx', { params: { liste, periode, date }, responseType: 'blob' });
+  getStats: (periode: OperationPeriod, date?: string, terminal: 'TOUS' | 'LCT' | 'TOGO' = 'TOUS') => api.get<{ stats: OperationStats }>('/operations/stats', { params: { periode, date, terminal } }),
+  exportExcel: async (liste: OperationExportKind | 'statistiques' | 'stock-actuel', periode: OperationPeriod, date?: string, filtre?: string, terminal: 'TOUS' | 'LCT' | 'TOGO' = 'TOUS') => {
+    const response = await api.get<Blob>(liste === 'stock-actuel' ? '/operations/stock-actuel.xlsx' : liste === 'statistiques' ? '/operations/stats-export.xlsx' : '/operations/export.xlsx', { params: liste === 'stock-actuel' ? { filtre, terminal } : { liste, periode, date, terminal }, responseType: 'blob' });
     const disposition = String(response.headers['content-disposition'] ?? '');
     const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? `pia-trace-${liste}-${periode}.xlsx`;
     const url = URL.createObjectURL(response.data);
@@ -290,8 +310,36 @@ export const operationService = {
 };
 
 // Users
+export interface CurrentPiaStock {
+  arreteAu: string;
+  seuils: { warningAfterHours: number; criticalAfterHours: number };
+  total: number;
+  alertes: number;
+  critiques: number;
+  sansAlerte: number;
+  repartition: { tranche: string; nombre: number }[];
+  conteneurs: { id: number; numeroConteneur: string | null; numeroBL: string; terminalAffecte: string | null; paysDestination: string | null; dateEntreePia: string; heuresSejour: number; niveau: string }[];
+}
+
 export const userService = {
   getAll: () => api.get<{ users: UserSummary[] }>('/users'),
+  create: (data: RegisterRequest & { isActive: boolean }) => api.post<{ user: UserSummary }>('/users', data),
+  update: (id: number, data: Omit<RegisterRequest, 'password'> & { password?: string; isActive: boolean; updatedAt: string }) => api.put<{ user: UserSummary; sessionRevoked: boolean }>(`/users/${id}`, data),
+};
+
+export interface OperationalSettings {
+  destinationCountries: string[];
+  disabledDestinationCountries: string[];
+  rules: Record<'ATTENDU_PIA' | 'VU_A_QUAI' | 'SORTI_TERMINAL' | 'ENTRE_PIA', { warningAfterHours: number; criticalAfterHours: number }>;
+  version: number;
+  updatedAt: string | null;
+}
+export const settingsService = {
+  setCountryActive: (country: string, active: boolean, version: number) => api.patch<OperationalSettings>('/settings/destination-countries', { country, active, version }),
+  getCountries: () => api.get<{ countries: string[] }>('/settings/destination-countries'),
+  addCountry: (country: string, version: number) => api.post<OperationalSettings>('/settings/destination-countries', { country, version }),
+  get: () => api.get<OperationalSettings>('/settings'),
+  save: (data: Pick<OperationalSettings, 'rules' | 'version'>) => api.put<OperationalSettings>('/settings', data),
 };
 
 // Checkpoints

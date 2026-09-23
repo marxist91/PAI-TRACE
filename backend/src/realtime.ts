@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
 import { verifyAccessToken } from './middleware/auth';
+import { prisma } from './lib/prisma';
 
 export interface RealtimeNotification {
   id: number;
@@ -22,11 +23,14 @@ export function initializeRealtime(server: HttpServer) {
     },
   });
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
       if (!token || typeof token !== 'string') throw new Error('Token manquant');
-      socket.data.user = verifyAccessToken(token);
+      const decoded = verifyAccessToken(token);
+      const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+      if (!user?.isActive || user.tokenVersion !== (decoded.tokenVersion ?? 0)) throw new Error('Session révoquée');
+      socket.data.user = { id: user.id, role: user.role };
       next();
     } catch {
       next(new Error('Authentification temps réel refusée'));
@@ -48,6 +52,10 @@ export function publishNotifications(notifications: RealtimeNotification[]) {
   for (const notification of notifications) {
     io.to(`user:${notification.userId}`).emit('notification:new', notification);
   }
+}
+
+export function disconnectUser(id: number) {
+  io?.in(`user:${id}`).disconnectSockets(true);
 }
 
 export function publishOperationChange(clientId: number, payload: Record<string, unknown>) {

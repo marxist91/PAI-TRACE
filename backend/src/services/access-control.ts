@@ -1,6 +1,6 @@
 import type { AuthRequest } from '../middleware/auth';
 
-export const GLOBAL_ROLES = ['LOGISTICIEN'] as const;
+export const GLOBAL_ROLES = ['ADMIN', 'LOGISTICIEN'] as const;
 export const OPERATIONAL_ROLES = ['CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA'] as const;
 
 type SessionUser = NonNullable<AuthRequest['user']>;
@@ -25,7 +25,7 @@ export function canAccessContainer(
   user: SessionUser,
   container: { clientId: number; consignataireId: number; terminalAffecte: string | null; statut: string },
 ): boolean {
-  if (user.role === 'LOGISTICIEN') return true;
+  if (user.role === 'LOGISTICIEN' || user.role === 'ADMIN') return true;
   if (user.role === 'CLIENT' || user.role === 'CONSIGNATAIRE') return false;
   if (user.role === 'CONTROLEUR_LCT') return container.terminalAffecte === 'LCT';
   if (user.role === 'CONTROLEUR_TOGO') return container.terminalAffecte === 'TOGO';

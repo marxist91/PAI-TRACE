@@ -22,11 +22,12 @@ export interface TokenPayload {
   id: number;
   email: string;
   role: string;
+  tokenVersion?: number;
 }
 
 export function generateAccessToken(user: TokenPayload): string {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
+    { id: user.id, email: user.email, role: user.role, tokenVersion: user.tokenVersion ?? 0 },
     JWT_SECRET,
     { expiresIn: ACCESS_TOKEN_EXPIRY },
   );
@@ -34,7 +35,7 @@ export function generateAccessToken(user: TokenPayload): string {
 
 export function generateRefreshToken(user: TokenPayload): string {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
+    { id: user.id, email: user.email, role: user.role, tokenVersion: user.tokenVersion ?? 0 },
     JWT_REFRESH_SECRET,
     { expiresIn: `${REFRESH_TOKEN_EXPIRY_DAYS}d` },
   );
@@ -51,7 +52,7 @@ export function verifyAccessToken(token: string): TokenPayload {
 export async function createRefreshToken(userId: number): Promise<string> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, role: true },
+    select: { id: true, email: true, role: true, tokenVersion: true },
   });
 
   if (!user) {
@@ -97,7 +98,7 @@ export async function authenticate(
     const decoded = verifyAccessToken(token);
 
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-    if (!user) {
+    if (!user || !user.isActive || user.tokenVersion !== (decoded.tokenVersion ?? 0)) {
       res.status(401).json({ error: 'Utilisateur non trouvé' });
       return;
     }
@@ -111,7 +112,7 @@ export async function authenticate(
 
 export function requireRole(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !(roles.includes(req.user.role) || (req.user.role === 'ADMIN' && roles.includes('LOGISTICIEN')))) {
       res.status(403).json({ error: 'Accès non autorisé' });
       return;
     }

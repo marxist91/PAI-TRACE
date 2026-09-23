@@ -11,6 +11,7 @@ import usersRoutes from './routes/users';
 import notificationsRoutes from './routes/notifications';
 import manifestesRoutes from './routes/manifestes';
 import operationsRoutes from './routes/operations';
+import settingsRoutes from './routes/settings';
 
 export function createApp() {
   const app = express();
@@ -30,6 +31,7 @@ export function createApp() {
   app.use('/api/mouvements', mouvementsRoutes);
   app.use('/api/anomalies', anomaliesRoutes);
   app.use('/api/users', usersRoutes);
+  app.use('/api/settings', settingsRoutes);
   app.use('/api/notifications', notificationsRoutes);
   app.use('/api/manifestes', manifestesRoutes);
   app.use('/api/operations', operationsRoutes);

@@ -34,13 +34,13 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function RoleRoute({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
   const { user } = useAuth();
-  return user && roles.includes(user.role) ? children : <Navigate to="/" replace />;
+  return user && (roles.includes(user.role) || (user.role === 'ADMIN' && roles.includes('LOGISTICIEN'))) ? children : <Navigate to="/" replace />;
 }
 
 function RoleHome() {
   const { user } = useAuth();
   if (user?.role && ['CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA'].includes(user.role)) return <OperationalDashboardPage />;
-  if (user?.role !== 'LOGISTICIEN') return <Navigate to="/login" replace />;
+  if (!user || !['ADMIN', 'LOGISTICIEN'].includes(user.role)) return <Navigate to="/login" replace />;
   return <PilotagePage />;
 }
 
@@ -68,8 +68,8 @@ export default function App() {
         <Route path="rapports" element={<RoleRoute roles={['LOGISTICIEN']}><RapportsPage /></RoleRoute>} />
         <Route path="mouvements" element={<MouvementsPage />} />
         <Route path="anomalies" element={<RoleRoute roles={['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA']}><AnomaliesPage /></RoleRoute>} />
-        <Route path="utilisateurs" element={<RoleRoute roles={['LOGISTICIEN']}><UtilisateursPage /></RoleRoute>} />
-        <Route path="parametres" element={<ParametresPage />} />
+        <Route path="utilisateurs" element={<RoleRoute roles={['ADMIN']}><UtilisateursPage /></RoleRoute>} />
+        <Route path="parametres" element={<RoleRoute roles={['ADMIN']}><ParametresPage /></RoleRoute>} />
       </Route>
     </Routes>
   );

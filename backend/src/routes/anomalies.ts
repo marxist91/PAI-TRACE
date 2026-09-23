@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { ANOMALY_STATUSES, evaluateAnomaly, Severity } from '../services/anomaly-rules';
 import { syncAnomalyNotifications } from '../services/anomaly-notifications';
 import { containerScopeFor } from '../services/access-control';
+import { readSettings } from '../services/operational-settings';
 
 const router = Router();
 
@@ -53,6 +54,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     });
 
     const now = Date.now();
+    const settings = await readSettings();
     const allAnomalies = conteneurs.flatMap((conteneur) => {
       // Le volume de démonstration reste stable : seuls les cas explicitement
       // marqués simulent une anomalie. Les vraies unités restent calculées par délai.
@@ -63,7 +65,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
             : conteneur.dateArrivee;
       const referenceDate = conteneur.isDemoAnomaly ? conteneur.dateArrivee : operationalDate ?? conteneur.checkpoints[0]?.date ?? conteneur.dateArrivee;
       const hoursOpen = Math.max(0, Math.floor((now - referenceDate.getTime()) / 3_600_000));
-      const info = evaluateAnomaly(conteneur.statut, hoursOpen);
+      const info = evaluateAnomaly(conteneur.statut, hoursOpen, settings.rules);
       if (!info) return [];
 
       return [{
@@ -101,7 +103,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity] || b.hoursOpen - a.hoursOpen)
       .slice(0, limit);
 
-    if (req.user?.role === 'LOGISTICIEN') {
+    if (req.user && ['ADMIN', 'LOGISTICIEN'].includes(req.user.role)) {
       await syncAnomalyNotifications(allAnomalies);
     }
 

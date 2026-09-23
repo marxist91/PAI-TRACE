@@ -1,4 +1,6 @@
 import { Router, Request, Response } from 'express';
+import { readSettings } from '../services/operational-settings';
+import { activeDestinationCountries, configuredDestination } from '../services/destination-countries';
 import { operationError } from '../services/operation-validation';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -376,6 +378,13 @@ router.post('/:id/checkpoints', authenticate, requireRole('LOGISTICIEN', 'CONTRO
     }
     if (data.type === 'PIA') newStatut = /SORTIE/.test(action) ? 'SORTI_PIA' : 'ENTRE_PIA';
 
+    if (newStatut === 'SORTI_PIA') {
+      const settings = await readSettings();
+      const country = configuredDestination(data.paysDestination, activeDestinationCountries(settings.destinationCountries, settings.disabledDestinationCountries));
+      if (!country) { res.status(400).json({ error: 'Choisissez un pays de destination configuré dans les paramètres. Pour un nouveau pays, contactez l’administrateur.' }); return; }
+      data.paysDestination = country;
+    }
+
     const validationError = operationError(conteneur, newStatut, new Date(data.date));
     if (validationError) {
       res.status(409).json({ error: validationError });
@@ -384,8 +393,9 @@ router.post('/:id/checkpoints', authenticate, requireRole('LOGISTICIEN', 'CONTRO
 
     const operationalRecipients = await prisma.user.findMany({
       where: {
+        isActive: true,
         OR: [
-          { role: 'LOGISTICIEN' },
+          { role: { in: ['ADMIN', 'LOGISTICIEN'] } },
           { role: 'AGENT_PIA' },
           { role: conteneur.terminalAffecte === 'LCT' ? 'CONTROLEUR_LCT' : 'CONTROLEUR_TOGO' },
         ],

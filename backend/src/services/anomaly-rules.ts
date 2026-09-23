@@ -54,14 +54,16 @@ export const ANOMALY_RULES: Record<TrackedAnomalyStatus, AnomalyRule> = {
 
 export const ANOMALY_STATUSES = Object.keys(ANOMALY_RULES) as TrackedAnomalyStatus[];
 
-export function evaluateAnomaly(statut: string, hoursInStage: number): AnomalyEvaluation | null {
-  const rule = ANOMALY_RULES[statut as TrackedAnomalyStatus];
+export function evaluateAnomaly(statut: string, hoursInStage: number, overrides?: Partial<Record<TrackedAnomalyStatus, { warningAfterHours: number; criticalAfterHours: number }>>): AnomalyEvaluation | null {
+  const base = ANOMALY_RULES[statut as TrackedAnomalyStatus];
+  const custom = overrides?.[statut as TrackedAnomalyStatus];
+  const rule = base && { ...base, ...custom };
   if (!rule || hoursInStage < rule.warningAfterHours) return null;
 
   return {
     severity: hoursInStage >= rule.criticalAfterHours ? 'critical' : 'warning',
     title: rule.title,
-    description: rule.description,
+    description: custom ? `Délai de ${rule.warningAfterHours} h atteint à cette étape sans passage à l’étape suivante.` : rule.description,
     thresholdHours: rule.warningAfterHours,
     criticalAfterHours: rule.criticalAfterHours,
   };

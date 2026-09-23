@@ -12,10 +12,13 @@ import {
   Warehouse,
   WarningCircle,
 } from '@phosphor-icons/react';
-import { conteneurService, type Conteneur } from '../services/api';
+import { conteneurService, type Conteneur, type OperationPeriod } from '../services/api';
+import { OperationPeriodPicker } from '../components/OperationPeriodPicker';
+import { inOperationPeriod, operationPeriodLabel } from '../utils/operation-period';
 import { StatusChip } from '../components/StatusChip';
 import { OpsHeader, OpsMetricStrip, OpsPage, OpsPanel, OpsState } from '../components/OperationsUI';
 import { useAuth } from '../contexts/AuthContext';
+import { matchesContainerStage } from '../utils/container-stage';
 
 const STATUT_LABELS: Record<string, string> = {
   ATTENDU_PIA: 'Attendu à la PIA',
@@ -38,6 +41,7 @@ const STATUT_LABELS: Record<string, string> = {
 const FILTRES = ['', 'ATTENDU_PIA', 'VU_A_QUAI', 'SORTI_TERMINAL', 'ENTRE_PIA', 'SORTI_PIA'];
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'UTC',
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
@@ -69,17 +73,21 @@ function JourneyDates({ conteneur }: { conteneur: Conteneur }) {
 
 export default function ConteneursPage() {
   const { user } = useAuth();
-  const isLogisticien = user?.role === 'LOGISTICIEN';
+  const isLogisticien = user?.role === 'LOGISTICIEN' || user?.role === 'ADMIN';
   const title = user?.role === 'CONTROLEUR_LCT' ? 'File des conteneurs LCT'
         : user?.role === 'CONTROLEUR_TOGO' ? 'File Togo Terminal'
           : user?.role === 'AGENT_PIA' ? 'Conteneurs attendus à la PIA' : 'Registre des conteneurs';
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statut, setStatut] = useState('');
+  const [periode, setPeriode] = useState<OperationPeriod>('jour');
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const dateField = ({ SORTI_TERMINAL: 'dateSortieTerminal', ENTRE_PIA: 'dateEntreePia', SORTI_PIA: 'dateSortiePia' } as const)[statut as 'SORTI_TERMINAL' | 'ENTRE_PIA' | 'SORTI_PIA'];
 
   const query = useQuery({
-    queryKey: ['conteneurs', { statut, search }],
-    queryFn: () => conteneurService.getAll({ statut: statut || undefined, search: search || undefined }),
+    queryKey: ['conteneurs', 'parcours', user?.id, { search }],
+    // Fetch the complete server-authorized scope: current status must not hide past steps.
+    queryFn: () => conteneurService.getAll({ search: search || undefined }),
   });
 
   const deleteMutation = useMutation({
@@ -87,9 +95,9 @@ export default function ConteneursPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['conteneurs'] }),
   });
 
-  const conteneurs = query.data?.data.conteneurs ?? [];
-  const aQuai = conteneurs.filter((item) => item.statut === 'VU_A_QUAI').length;
-  const terminal = conteneurs.filter((item) => item.statut === 'SORTI_TERMINAL').length;
+  const conteneurs = (query.data?.data.conteneurs ?? []).filter(item => matchesContainerStage(item, statut) && (!dateField || inOperationPeriod(item[dateField], periode, date)));
+  const aQuai = conteneurs.filter((item) => matchesContainerStage(item, 'VU_A_QUAI')).length;
+  const terminal = conteneurs.filter((item) => matchesContainerStage(item, 'SORTI_TERMINAL')).length;
   const pia = conteneurs.filter((item) => ['ENTRE_PIA', 'SORTI_PIA'].includes(item.statut)).length;
 
   const exportCsv = () => {
@@ -141,11 +149,12 @@ export default function ConteneursPage() {
         </div>
       </div>
 
-      <div className="ops-filter-bar" aria-label="Filtrer par statut">
+      <div className="ops-filter-bar" aria-label="Filtrer par étape enregistrée">
         {FILTRES.map((filter) => <button key={filter || 'tous'} className={statut === filter ? 'active' : ''} onClick={() => setStatut(filter)}>{filter ? STATUT_LABELS[filter] : 'Tous'}</button>)}
       </div>
+      {dateField && <div className="ops-toolbar"><OperationPeriodPicker periode={periode} date={date} onPeriodChange={setPeriode} onDateChange={setDate} /><span>{operationPeriodLabel(periode, date)}</span></div>}
 
-      <OpsPanel title={`${conteneurs.length.toLocaleString('fr-FR')} conteneurs`} subtitle={statut ? `Filtre actif : ${STATUT_LABELS[statut]}` : 'Ensemble du registre visible'}>
+      <OpsPanel title={`${conteneurs.length.toLocaleString('fr-FR')} conteneurs`} subtitle={dateField ? `${STATUT_LABELS[statut]} — ${operationPeriodLabel(periode, date)}. Étape réalisée, quel que soit le statut actuel.` : statut ? `Filtre actif : ${STATUT_LABELS[statut]} — toutes dates` : 'Ensemble du registre visible — toutes dates'}>
         {query.isLoading ? <OpsState icon={ShippingContainer} title="Chargement du registre" description="Lecture des conteneurs dans Prisma." /> :
           query.isError ? <OpsState icon={WarningCircle} title="Registre indisponible" description="Vérifiez la connexion aux données puis actualisez." tone="danger" /> :
           conteneurs.length === 0 ? <OpsState icon={MagnifyingGlass} title="Aucun conteneur trouvé" description="Modifiez le filtre ou la recherche." /> :

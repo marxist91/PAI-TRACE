@@ -90,7 +90,7 @@ async function main() {
         const after = await snapshot(id);
         assert.equal(after.checkpoints.length, before.checkpoints.length + 1);
         assert.equal(after.movements.length, before.movements.length + 1);
-        const recipients: Array<{ id: number }> = await prisma.user.findMany({ where: { role: { in: ['LOGISTICIEN', 'AGENT_PIA', role] } }, select: { id: true } });
+        const recipients: Array<{ id: number }> = await prisma.user.findMany({ where: { isActive: true, role: { in: ['ADMIN', 'LOGISTICIEN', 'AGENT_PIA', role] } }, select: { id: true } });
         const added = after.notifications.slice(before.notifications.length);
         assert.deepEqual(added.map(n => n.userId).sort((a,b) => a-b), recipients.map(u => u.id).sort((a,b) => a-b));
         checks++;
