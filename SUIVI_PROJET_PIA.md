@@ -1,5 +1,18 @@
 # 📋 Projet PIA — Suivi de Réalisation
 
+### Correctifs de sécurité des dépendances — 23/09/2026
+
+Audit initial backend : 9 alertes ; web : 2. Correctifs compatibles et overrides
+transitifs ciblés appliqués, Prisma 7.9.1 et ExcelJS 4 conservés. Réinstallation
+reproductible et audits complets : zéro vulnérabilité signalée. 76 tests backend,
+13 tests web et les deux compilations passent. Génération Prisma sans migration ni
+modification de la base métier. Audit bloquant ajouté au workflow GitHub.
+Détails et maintenance des overrides dans SECURITE_DEPENDANCES.md.
+Lot sécurité encore local : publication et déploiement restent à faire.
+
+Le correctif UI abed9ba a été déployé sur Render ; l'utilisateur confirme le rendu,
+les notifications et les mouvements entre acteurs.
+
 ### Lisibilité de la recette en ligne — 23/09/2026
 
 L'utilisateur confirme les notifications et les mouvements inter-acteurs sur Render.

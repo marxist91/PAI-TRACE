@@ -1,12 +1,19 @@
 # ✅ TODO — Projet PIA
 
+## Correctifs sécurité des dépendances — 23/09/2026
+
+- [x] Audits backend/web : zéro alerte npm après corrections ciblées et réinstallation.
+- [x] 76 tests backend, 13 tests web, génération Prisma et compilations réussis.
+- [x] Audit bloquant ajouté au workflow GitHub ; overrides documentés dans SECURITE_DEPENDANCES.md.
+- [ ] Publier le lot sécurité, vérifier les recettes GitHub puis redéployer Render.
+
 ## Lisibilité après déploiement — 23/09/2026
 
 - [x] Recette en ligne confirmée par l'utilisateur : notifications et mouvements entre acteurs fonctionnels.
 - [x] Corriger la cascade CSS : les styles tardifs réduisaient les textes à 8–10 px.
 - [x] Couche readability.css chargée en dernier : tableaux 15 px, textes secondaires 13–14 px, champs 16 px et actions agrandies.
 - [x] Contrôle visuel local du registre et de la connexion, sans opération métier.
-- [ ] Publier puis redéployer le correctif de lisibilité sur Render et confirmer le rendu avec l'utilisateur.
+- [x] Correctif de lisibilité abed9ba publié, workflow GitHub réussi, Render Live ; rendu confirmé par l'utilisateur.
 
 ## Recette gratuite Render + Prisma — 23/09/2026
 
