@@ -1,0 +1,24 @@
+# Recette gratuite seulement : aucune base Render, aucun disque payant.
+services:
+  - type: web
+    name: pia-trace-test
+    runtime: node
+    plan: free
+    region: frankfurt
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --prefix backend --include=dev && npm run build --prefix backend && npm ci --prefix web --include=dev && npm run build --prefix web
+    startCommand: cd backend && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: NODE_ENV
+        value: production
+      - key: WEB_DIST_DIR
+        value: ../web/dist
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true

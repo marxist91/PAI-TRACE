@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { validateProductionSecrets } from '../services/deployment-config';
+
+validateProductionSecrets(process.env);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'pia-jwt-secret-dev';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'pia-refresh-secret-dev';

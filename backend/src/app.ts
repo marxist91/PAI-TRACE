@@ -12,11 +12,14 @@ import notificationsRoutes from './routes/notifications';
 import manifestesRoutes from './routes/manifestes';
 import operationsRoutes from './routes/operations';
 import settingsRoutes from './routes/settings';
+import { frontendOrigin } from './services/deployment-config';
+import { mountWeb } from './services/web-hosting';
 
 export function createApp() {
   const app = express();
+  app.disable('x-powered-by');
   const corsOptions = {
-    origin: process.env.FRONTEND_URL || '*',
+    origin: frontendOrigin(process.env),
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   };
@@ -39,6 +42,8 @@ export function createApp() {
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
   });
+
+  if (process.env.WEB_DIST_DIR) mountWeb(app, process.env.WEB_DIST_DIR);
 
   return app;
 }

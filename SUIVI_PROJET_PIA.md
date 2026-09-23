@@ -1,5 +1,21 @@
 # 📋 Projet PIA — Suivi de Réalisation
 
+### Préparation de la recette gratuite Render — 23/09/2026
+
+Service unique Node Free défini dans render.yaml : React compilé servi par Express,
+API et Socket.IO sur la même origine HTTPS. Secrets distincts générés par Render et
+contrôlés au démarrage ; origine CORS déduite de RENDER_EXTERNAL_URL, sans wildcard
+en production. Déploiements automatiques désactivés, aucune migration ou génération
+de données au build/démarrage. Guide DEPLOIEMENT_RENDER.md ajouté.
+
+Validation : 74 tests backend, compilation API et web réussies. Configuration locale
+seulement : aucun service créé, aucune donnée modifiée, aucun abonnement souscrit.
+Connexion Render, choix de la base et sécurisation des comptes avant publication restent
+à réaliser. Les données actuelles comprennent encore des simulations de recette.
+
+Le lot précédent a été publié dans le commit 172327a ; GitHub Actions 35872495933
+a réussi. L'utilisateur a confirmé les boutons de destination et le compteur Sorties PIA.
+
 ### Recette PostgreSQL et contrôle automatique — 23/09/2026
 
 Base temporaire dédiée pia_trace_test sur PostgreSQL 17, port local 60267, sans modification du fichier .env ni de la base applicative. Installation des 12 migrations depuis une base vide réussie. test:protection-db : 44 scénarios réussis (droits, dates, LCT/Togo, concurrence, refus sans écritures, notifications). test:admin-db étendu et réussi : ajout/doublon/pays exclu, désactivation, lecture des seuls pays actifs, version périmée, refus de sorties sans modification ni checkpoint/mouvement/notification, réactivation, sortie normalisée et historique préservé après désactivation.

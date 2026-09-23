@@ -23,6 +23,10 @@ Les espaces Client et Consignataire ne font plus partie du produit actif.
 
 ## Démarrage local
 
+Pour préparer une recette en ligne gratuite (Render + Prisma), suivre
+[le guide de déploiement](DEPLOIEMENT_RENDER.md). Ne pas utiliser les commandes de
+génération de données ci-dessous sur une base partagée ou publiée.
+
 Prérequis : Node.js, npm et une base PostgreSQL accessible.
 
 1. Copier `backend/.env.example` vers `backend/.env`, puis renseigner `DATABASE_URL`, `JWT_SECRET` et `JWT_REFRESH_SECRET`.

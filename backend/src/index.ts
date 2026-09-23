@@ -6,7 +6,7 @@ import { createApp } from './app';
 
 const app = createApp();
 const server = createServer(app);
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
 
 // Gestion gracieuse de l'arrêt
 process.on('SIGTERM', async () => {
@@ -18,7 +18,7 @@ process.on('SIGTERM', async () => {
 // Démarrage du serveur
 initializeRealtime(server);
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
 });

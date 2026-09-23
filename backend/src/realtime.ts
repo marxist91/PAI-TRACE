@@ -2,6 +2,7 @@ import type { Server as HttpServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
 import { verifyAccessToken } from './middleware/auth';
 import { prisma } from './lib/prisma';
+import { frontendOrigin } from './services/deployment-config';
 
 export interface RealtimeNotification {
   id: number;
@@ -18,7 +19,7 @@ let io: SocketServer | null = null;
 export function initializeRealtime(server: HttpServer) {
   io = new SocketServer(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || '*',
+      origin: frontendOrigin(process.env),
       methods: ['GET', 'POST'],
     },
   });

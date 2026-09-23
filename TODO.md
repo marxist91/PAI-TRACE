@@ -1,5 +1,14 @@
 # ✅ TODO — Projet PIA
 
+## Recette gratuite Render + Prisma — 23/09/2026
+
+- [x] Blueprint explicitement Free, un seul service interface/API/Socket.IO, sans ressource payante ni migration automatique.
+- [x] Origine HTTPS Render, secrets JWT contrôlés, routes React rechargeables et assets servis par Express.
+- [x] 74 tests backend et compilations backend/web réussis.
+- [x] Guide DEPLOIEMENT_RENDER.md : quotas, données partagées, comptes de test, sauvegarde et étapes de publication.
+- [ ] Publier la préparation, connecter Render et confirmer la base Prisma de recette (aucune mise en ligne effectuée).
+- [ ] Sécuriser les comptes avant exposition et effectuer la recette sur l'URL publique.
+
 ## Recette de protection et automatisation — 23/09/2026
 
 - [x] Base PostgreSQL 17 temporaire indépendante : les 12 migrations s’appliquent depuis une base vide.
@@ -7,7 +16,7 @@
 - [x] Recette administration étendue aux pays : droits, doublons, Togo, désactivation, refus sans écriture, réactivation, historique conservé.
 - [x] Nettoyage vérifié : aucun utilisateur, conteneur, checkpoint, notification ni paramètre de recette restant.
 - [x] Workflow GitHub enrichi avec PostgreSQL éphémère et recettes protection/admin.
-- [ ] Commit/push autorisé puis vérifier l’exécution du workflow sur GitHub ; aucune publication effectuée dans cette étape.
+- [x] Commit 172327a publié sur main ; workflow GitHub Actions 35872495933 réussi.
 
 ## Désactivation des destinations et pilotage — 23/09/2026
 
@@ -15,7 +24,7 @@
 - [x] Boutons ADMIN Désactiver/Réactiver, statut visible ; catalogue et historique conservés, filtre des destinations actives côté formulaire et serveur.
 - [x] Compteur Sorties PIA ajouté au pilotage pour jour/semaine/mois ; cinq indicateurs sur grand écran.
 - [x] 68 tests backend et 12 tests web réussis, compilations réussies.
-- [ ] Recette visuelle des boutons et du compteur avec session ADMIN (session inspectée : Agent PIA).
+- [x] Recette des boutons pays et du compteur Sorties PIA confirmée par l'utilisateur.
 
 ## Pays de destination configurables — 23/09/2026
 
