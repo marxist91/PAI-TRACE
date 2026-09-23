@@ -1,5 +1,13 @@
 # ✅ TODO — Projet PIA
 
+## Lisibilité après déploiement — 23/09/2026
+
+- [x] Recette en ligne confirmée par l'utilisateur : notifications et mouvements entre acteurs fonctionnels.
+- [x] Corriger la cascade CSS : les styles tardifs réduisaient les textes à 8–10 px.
+- [x] Couche readability.css chargée en dernier : tableaux 15 px, textes secondaires 13–14 px, champs 16 px et actions agrandies.
+- [x] Contrôle visuel local du registre et de la connexion, sans opération métier.
+- [ ] Publier puis redéployer le correctif de lisibilité sur Render et confirmer le rendu avec l'utilisateur.
+
 ## Recette gratuite Render + Prisma — 23/09/2026
 
 - [x] Blueprint explicitement Free, un seul service interface/API/Socket.IO, sans ressource payante ni migration automatique.

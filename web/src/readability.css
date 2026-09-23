@@ -1,0 +1,139 @@
+/* Final readability scale: keep after legacy component styles. No page zoom. */
+body {
+  font-size: 16px;
+}
+
+.command-brand strong { font-size: 19px; }
+.command-brand small { font-size: 13px; }
+.command-nav a { font-size: 15px; }
+.command-sidebar-foot span { font-size: 15px; }
+.command-sidebar-foot p,
+.command-sidebar-foot button { font-size: 14px; }
+.command-search input { font-size: 16px; }
+.command-user-copy strong { font-size: 15px; }
+.command-user-copy span { font-size: 13px; }
+.command-kicker { font-size: 14px !important; }
+.command-heading p:not(.command-kicker) { font-size: 16px; }
+.command-live,
+.command-time { font-size: 15px; }
+.command-error,
+.command-error strong { font-size: 14px; }
+.command-error span,
+.command-error button { font-size: 13px; }
+.command-metric p { font-size: 15px; }
+.command-metric strong { font-size: 30px; }
+.command-panel-heading h2,
+.corridor-title h2 { font-size: 16px; }
+.command-panel-heading p,
+.corridor-title p { font-size: 14px; }
+.command-panel-heading a,
+.map-open { font-size: 14px; }
+.corridor-stage small,
+.corridor-legend,
+.map-checkpoint small,
+.map-scale,
+.map-compass span { font-size: 13px; }
+.corridor-stage h3,
+.map-checkpoint strong { font-size: 15px; }
+.corridor-stage p { font-size: 14px; }
+.command-exception-list strong { font-size: 15px; }
+.command-exception-list p { font-size: 14px; }
+.command-exception-list small,
+.command-exception-time span { font-size: 13px; }
+.command-table-wrap th { font-size: 13px; }
+.command-table-wrap td { font-size: 14px; }
+.command-table-wrap td:first-child a { font-size: 15px; }
+.command-table-wrap td small { font-size: 13px; }
+.command-list-loading,
+.command-empty { font-size: 15px; }
+.command-empty strong { font-size: 16px; }
+.command-empty span { font-size: 14px; }
+
+.ops-header h1 { font-size: clamp(28px, 2.5vw, 36px); }
+.ops-header p { font-size: 15px; line-height: 1.5; }
+.ops-button,
+.ops-icon-button { min-height: 44px; font-size: 15px; }
+.ops-icon-button { width: 44px; }
+.ops-input,
+.ops-select,
+.ops-textarea { min-height: 46px; font-size: 16px; }
+.ops-filter-bar button { min-height: 44px; font-size: 14px; }
+.ops-panel-head { min-height: 62px; }
+.ops-panel-head h2 { font-size: 16px; }
+.ops-panel-head p { font-size: 14px; line-height: 1.45; }
+.ops-metric { min-height: 96px; }
+.ops-metric span { font-size: 14px; }
+.ops-metric strong { font-size: 26px; }
+.ops-table th { height: 44px; font-size: 13px; }
+.ops-table td { padding-block: 12px; font-size: 15px; line-height: 1.4; }
+.ops-table small,
+.ops-table td p { font-size: 13px; line-height: 1.4; }
+.ops-state strong { font-size: 16px; }
+.ops-state span { font-size: 14px; }
+.ops-field label,
+.ops-field > span,
+.ops-field-error { font-size: 14px; }
+.status-chip,
+.ops-severity { font-size: 13px; }
+.ops-stage strong { font-size: 15px; }
+.ops-stage b { font-size: 24px; }
+.ops-stage small { font-size: 13px; }
+.ops-pie > strong { font-size: 24px; }
+.ops-pie > strong span,
+.ops-chart-legend > div,
+.ops-exception-summary span { font-size: 14px; }
+.ops-settings-list span strong,
+.ops-settings-list b { font-size: 15px; }
+.ops-settings-list span small { font-size: 13px; line-height: 1.4; }
+.ops-profile-block strong { font-size: 16px; }
+.ops-profile-block small { font-size: 13px; }
+.ops-status-band small { font-size: 13px; }
+.ops-status-band strong { font-size: 22px; }
+.ops-status-date b { font-size: 14px !important; }
+.ops-timeline-item strong { font-size: 15px; }
+.ops-timeline-item em,
+.ops-timeline-item small { font-size: 13px; }
+.ops-timeline-item p { font-size: 14px; line-height: 1.45; }
+.ops-info-grid small { font-size: 13px; }
+.ops-info-grid strong { font-size: 15px; }
+.ops-document-list > div > span:first-child { font-size: 14px; }
+
+.login-command-brand span { font-size: 14px; }
+.login-command-card > p { font-size: 15px; line-height: 1.5; }
+.login-error { font-size: 14px; }
+
+.ops-page { max-width: 1680px; }
+.ops-button, .ops-icon-button { font-weight: 650; }
+.ops-table td { padding-block: 16px; }
+.ops-table small, .ops-table td p { color: #a5b5cc; }
+.ops-table th { color: #b7c5da; }
+.ops-container-table td:nth-child(4) small { max-width: 30rem; overflow-wrap: anywhere; }
+.ops-journey-dates { min-width: 265px; }
+.ops-journey-date { grid-template-columns: 110px 1fr; font-size: 13px; }
+.ops-journey-date time, .ops-journey-date b { font-size: 13px; }
+.ops-filter-bar { overflow-x: auto; }
+.ops-filter-bar button { flex-shrink: 0; }
+.ops-panel-head, .ops-metric { min-width: 0; }
+.ops-panel-head p, .ops-header p { color: #a5b5cc; }
+.command-top-actions .command-live { font-size: 14px; }
+.command-nav a { font-size: 15px; }
+.command-user-copy strong { font-size: 14px; }
+.command-user-copy span { font-size: 13px; }
+.login-command-card { width: min(440px, 100%); }
+.login-command-card h2 { font-size: 30px; }
+.login-command-card form { gap: 20px; }
+.login-command-card .ops-input { min-height: 50px; font-size: 16px; }
+.login-command-card .ops-button { min-height: 48px; font-size: 16px; }
+.login-command-card .admin-password { grid-template-columns: minmax(0, 1fr) 48px; }
+.login-command-card .admin-password > .ops-button { width: 48px; min-width: 48px; }
+.login-command-message p { font-size: 16px; }
+.login-command-brand span { font-size: 13px; }
+@media (min-width: 900px) {
+  .login-command { grid-template-columns: minmax(0, 1.2fr) minmax(440px, .9fr); }
+}
+@media (max-width: 759px) {
+  .ops-panel-head { flex-wrap: wrap; }
+  .ops-metric { padding: 14px 12px; }
+  .ops-metric strong { font-size: 24px; }
+  .login-command-form { padding: 24px 20px; }
+}

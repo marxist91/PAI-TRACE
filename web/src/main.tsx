@@ -5,6 +5,8 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import App from './App';
 import './index.css';
+// Readability must follow the legacy component rules.
+import './readability.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

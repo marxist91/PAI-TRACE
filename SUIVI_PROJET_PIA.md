@@ -1,5 +1,16 @@
 # 📋 Projet PIA — Suivi de Réalisation
 
+### Lisibilité de la recette en ligne — 23/09/2026
+
+L'utilisateur confirme les notifications et les mouvements inter-acteurs sur Render.
+Correction locale de l'interface trop petite : anciennes règles de 8–10 px écrasant
+le bloc d'accessibilité. Ce bloc est déplacé dans readability.css, importé en dernier,
+avec corps de tableaux à 15 px, champs à 16 px, détails à 13–14 px et actions de 44 px
+minimum. Connexion élargie, contraste des textes secondaires amélioré et largeur des
+descriptions limitée, sans masquer les données. Aucun zoom global, changement métier
+ou écriture dans la base. Vérification visuelle locale connexion/registre réalisée.
+Publication et redéploiement du correctif restent à faire.
+
 ### Préparation de la recette gratuite Render — 23/09/2026
 
 Service unique Node Free défini dans render.yaml : React compilé servi par Express,
