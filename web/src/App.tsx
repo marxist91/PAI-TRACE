@@ -20,6 +20,8 @@ const PilotagePage = lazy(() => import('./pages/PilotagePage'));
 const ManifestesPage = lazy(() => import('./pages/ManifestesPage'));
 const QuaiPage = lazy(() => import('./pages/QuaiPage'));
 const PiaOperationsPage = lazy(() => import('./pages/PiaOperationsPage'));
+const SejoursPage = lazy(() => import('./pages/SejoursPage'));
+const TerminalQueuePage = lazy(() => import('./pages/TerminalQueuePage'));
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -65,11 +67,13 @@ export default function App() {
         <Route path="manifestes" element={<RoleRoute roles={['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO']}><ManifestesPage /></RoleRoute>} />
         <Route path="quai" element={<RoleRoute roles={['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA']}><QuaiPage /></RoleRoute>} />
         <Route path="pia" element={<RoleRoute roles={['LOGISTICIEN', 'AGENT_PIA']}><PiaOperationsPage /></RoleRoute>} />
+        <Route path="sejours" element={<RoleRoute roles={['LOGISTICIEN', 'AGENT_PIA']}><SejoursPage /></RoleRoute>} />
+        <Route path="file-terminal" element={<RoleRoute roles={['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO']}><TerminalQueuePage /></RoleRoute>} />
         <Route path="conteneurs/nouveau" element={<RoleRoute roles={['LOGISTICIEN']}><ConteneurFormPage /></RoleRoute>} />
         <Route path="conteneurs/:id" element={<ConteneurDetailPage />} />
         <Route path="conteneurs/:id/editer" element={<RoleRoute roles={['LOGISTICIEN']}><ConteneurFormPage /></RoleRoute>} />
         <Route path="checkpoints" element={<RoleRoute roles={['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA']}><CheckpointsPage /></RoleRoute>} />
-        <Route path="rapports" element={<RoleRoute roles={['LOGISTICIEN']}><RapportsPage /></RoleRoute>} />
+        <Route path="rapports" element={<RoleRoute roles={['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA']}><RapportsPage /></RoleRoute>} />
         <Route path="mouvements" element={<MouvementsPage />} />
         <Route path="anomalies" element={<RoleRoute roles={['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA']}><AnomaliesPage /></RoleRoute>} />
         <Route path="utilisateurs" element={<RoleRoute roles={['ADMIN']}><UtilisateursPage /></RoleRoute>} />

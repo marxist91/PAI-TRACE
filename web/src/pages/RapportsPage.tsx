@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { CurrentPiaStockPanel } from '../components/CurrentPiaStockPanel';
 import { OperationPeriodPicker } from '../components/OperationPeriodPicker';
 import { useQuery } from '@tanstack/react-query';
@@ -15,10 +16,13 @@ const transferLabel = (hours: number | null | undefined) => {
 };
 
 export default function RapportsPage() {
+  const { user } = useAuth();
+  const fixedTerminal = user?.role === 'CONTROLEUR_LCT' ? 'LCT' : user?.role === 'CONTROLEUR_TOGO' ? 'TOGO' : null;
   const [periode, setPeriode] = useState<OperationPeriod>('semaine');
-  const [terminal, setTerminal] = useState<'TOUS' | 'LCT' | 'TOGO'>('TOUS');
+  const [selectedTerminal, setTerminal] = useState<'TOUS' | 'LCT' | 'TOGO'>('TOUS');
+  const terminal = fixedTerminal ?? selectedTerminal;
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [exportKind, setExportKind] = useState<OperationExportKind>('flux-pia');
+  const [exportKind, setExportKind] = useState<OperationExportKind>(fixedTerminal ? 'sorties-terminal' : 'flux-pia');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const download = async (kind: OperationExportKind | 'statistiques' = exportKind) => {
@@ -33,11 +37,11 @@ export default function RapportsPage() {
   const terminalData = stats?.byTerminal.map(item => ({ ...item, name: item.terminal === 'TOGO' ? 'Togo Terminal' : item.terminal === 'LCT' ? 'LCT' : 'Non renseigné' })) ?? [];
   const dailyData = stats?.daily.map(item => ({ ...item, jour: `${item.date.slice(8, 10)}/${item.date.slice(5, 7)}` })) ?? [];
   return <OpsPage>
-    <OpsHeader title="Statistiques opérationnelles" subtitle="Entrées, sorties et séjours à la PIA. Moyenne des séjours terminés pendant la période, arrondie à la minute." actions={<><OperationPeriodPicker periode={periode} date={date} onPeriodChange={setPeriode} onDateChange={setDate} /></>} />
+    <OpsHeader title={fixedTerminal ? `Statistiques — ${fixedTerminal === 'TOGO' ? 'Togo Terminal' : 'LCT'}` : user?.role === 'AGENT_PIA' ? 'Statistiques PIA' : 'Statistiques opérationnelles'} subtitle={fixedTerminal ? 'Sorties de votre terminal et suivi des mêmes conteneurs à la PIA. Aucun conteneur de l’autre terminal n’est inclus.' : 'Entrées, sorties et séjours à la PIA. Moyenne des séjours terminés pendant la période, arrondie à la minute.'} actions={<><OperationPeriodPicker periode={periode} date={date} onPeriodChange={setPeriode} onDateChange={setDate} /></>} />
     <div className="ops-inline-actions">
       <label htmlFor="stats-terminal">Terminal d’origine</label>
-      <select id="stats-terminal" className="ops-select" value={terminal} disabled={exporting} onChange={event => setTerminal(event.target.value as typeof terminal)}>
-        <option value="TOUS">Tous les terminaux autorisés</option><option value="LCT">LCT</option><option value="TOGO">Togo Terminal</option>
+      <select id="stats-terminal" className="ops-select" value={terminal} disabled={exporting || !!fixedTerminal} onChange={event => setTerminal(event.target.value as typeof terminal)}>
+        {!fixedTerminal && <option value="TOUS">Tous les terminaux autorisés</option>}{(!fixedTerminal || fixedTerminal === 'LCT') && <option value="LCT">LCT</option>}{(!fixedTerminal || fixedTerminal === 'TOGO') && <option value="TOGO">Togo Terminal</option>}
       </select>
     </div>
     <p>Ce filtre s’applique aux indicateurs, au stock actuel et à tous les exports de cette page, dans la limite de vos droits.</p>
@@ -57,7 +61,7 @@ export default function RapportsPage() {
       {exportError && <p role="alert" className="ops-inline-alert ops-inline-alert-danger">{exportError}</p>}
     </OpsPanel>
     {query.isLoading ? <OpsPanel><OpsState icon={ChartBar} title="Calcul des indicateurs" /></OpsPanel> : query.isError ? <OpsPanel><OpsState icon={WarningCircle} title="Statistiques indisponibles" tone="danger" /><button type="button" className="ops-button" disabled={query.isFetching} onClick={() => void query.refetch()}>{query.isFetching ? 'Chargement…' : 'Réessayer les statistiques'}</button></OpsPanel> : <>
-      <OpsMetricStrip items={[{ label: 'Destinés PIA — registre du périmètre', value: stats?.destinesPia ?? 0, icon: ShippingContainer }, { label: 'Entrées PIA — période', value: stats?.entreesPia ?? 0, icon: ArrowCircleDown }, { label: 'Sorties PIA — période', value: stats?.sortiesPia ?? 0, icon: ArrowCircleUp, tone: 'success' }, { label: 'Séjour moyen terminé', value: stayLabel, icon: Clock }]} />
+      <OpsMetricStrip items={[{ label: fixedTerminal ? 'Sorties terminal — période' : 'Destinés PIA — registre du périmètre', value: fixedTerminal ? stats?.sortiesTerminal ?? 0 : stats?.destinesPia ?? 0, icon: ShippingContainer }, { label: 'Entrées PIA — période', value: stats?.entreesPia ?? 0, icon: ArrowCircleDown }, { label: 'Sorties PIA — période', value: stats?.sortiesPia ?? 0, icon: ArrowCircleUp, tone: 'success' }, { label: 'Séjour moyen terminé', value: stayLabel, icon: Clock }]} />
       <OpsPanel title="Stock PIA de la période" subtitle="Reconstitué à partir des dates d’entrée et de sortie, indépendamment du statut actuel. Stock initial + entrées − sorties = stock final.">
         <OpsMetricStrip items={[
           { label: 'Présents au début', value: stats?.stockDebut ?? 'Non disponible', icon: ShippingContainer },

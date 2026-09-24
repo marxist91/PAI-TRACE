@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Icon } from '@phosphor-icons/react';
+import { Link } from 'react-router-dom';
 
 export function OpsPage({ children }: { children: ReactNode }) {
   return <div className="ops-page">{children}</div>;
@@ -49,6 +50,7 @@ export function OpsPanel({
 }
 
 export interface OpsMetricItem {
+  to?: string;
   label: string;
   value: number | string;
   icon: Icon;
@@ -58,10 +60,10 @@ export interface OpsMetricItem {
 export function OpsMetricStrip({ items }: { items: OpsMetricItem[] }) {
   return (
     <section className="ops-metric-strip" aria-label="Indicateurs de la page">
-      {items.map(({ label, value, icon: MetricIcon, tone = 'default' }) => (
+      {items.map(({ label, value, icon: MetricIcon, tone = 'default', to }) => (
         <article key={label} className={`ops-metric ops-metric-${tone}`}>
           <MetricIcon size={24} weight="duotone" />
-          <div><span>{label}</span><strong>{typeof value === 'number' ? value.toLocaleString('fr-FR') : value}</strong></div>
+          <div>{to ? <Link to={to} className="ops-metric-link"><span>{label} →</span><strong>{typeof value === 'number' ? value.toLocaleString('fr-FR') : value}</strong></Link> : <><span>{label}</span><strong>{typeof value === 'number' ? value.toLocaleString('fr-FR') : value}</strong></>}</div>
         </article>
       ))}
     </section>

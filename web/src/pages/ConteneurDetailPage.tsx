@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -46,6 +46,10 @@ export default function ConteneurDetailPage() {
       : user?.role === 'CONTROLEUR_TOGO' ? 'TERMINAL_TOGO'
         : user?.role === 'AGENT_PIA' ? 'PIA' : 'TERMINAL_LCT';
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const fromStay = searchParams.get('action') === 'sortie-pia';
+  const openedExitFor = useRef<string | undefined>(undefined);
+  const operationForm = useRef<HTMLFormElement>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showCheckpointForm, setShowCheckpointForm] = useState(false);
@@ -62,6 +66,16 @@ export default function ConteneurDetailPage() {
     queryKey: ['conteneur', id],
     queryFn: () => conteneurService.getById(Number(id)),
   });
+  useEffect(() => {
+    const row = data?.data.conteneur;
+    if (!fromStay || !row || openedExitFor.current === id || !user || !['ADMIN', 'LOGISTICIEN', 'AGENT_PIA'].includes(user.role) || !row.dateEntreePia || row.dateSortiePia) return;
+    openedExitFor.current = id;
+    setCheckpoint(previous => ({ ...previous, type: 'PIA', statut: 'SORTIE PIA', lieu: CHECKPOINT_PLACES.PIA }));
+    setShowCheckpointForm(true);
+  }, [data, fromStay, id, user]);
+  useEffect(() => {
+    if (fromStay && showCheckpointForm) operationForm.current?.scrollIntoView({ block: 'center' });
+  }, [fromStay, showCheckpointForm]);
 
   const addCheckpointMutation = useMutation({
     mutationFn: (data: typeof checkpoint) =>
@@ -84,6 +98,7 @@ export default function ConteneurDetailPage() {
         notes: '',
         paysDestination: '',
       });
+      if (fromStay) navigate('/sejours');
     },
   });
 
@@ -152,7 +167,7 @@ export default function ConteneurDetailPage() {
           {addCheckpointMutation.isError && <p role="alert" className="ops-inline-alert ops-inline-alert-danger">{isAxiosError(addCheckpointMutation.error) ? addCheckpointMutation.error.response?.data?.error || 'Enregistrement impossible. Réessayez.' : 'Enregistrement impossible.'}</p>}
           {!showCheckpointForm && <div className="ops-panel-footer"><button onClick={() => setShowCheckpointForm(true)} className="ops-button ops-button-primary">Ajouter un checkpoint</button></div>}
           {showCheckpointForm && (
-            <form onSubmit={(event) => { event.preventDefault(); addCheckpointMutation.mutate(checkpoint); }}>
+            <form id="operation" ref={operationForm} onSubmit={(event) => { event.preventDefault(); addCheckpointMutation.mutate(checkpoint); }}>
               <div className="ops-form-grid">
                 <div className="ops-field"><label htmlFor="checkpointType">Poste</label><select id="checkpointType" className="ops-select" value={checkpoint.type} disabled={!isLogisticien} onChange={(event) => { const type = event.target.value; setCheckpoint({ ...checkpoint, type, statut: '', lieu: CHECKPOINT_PLACES[type] ?? checkpoint.lieu }); }}>{Object.entries(CHECKPOINT_TYPES).filter(([value]) => isLogisticien || value === roleCheckpointType).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
                 <div className="ops-field"><label htmlFor="checkpointStatus">Action réalisée</label><select id="checkpointStatus" className="ops-select" value={checkpoint.statut} onChange={(event) => setCheckpoint({ ...checkpoint, statut: event.target.value })} required><option value="">Sélectionner l’action</option>{checkpoint.type.startsWith('TERMINAL_') && canExitTerminal && <option value="SORTIE TERMINAL">Sortie du terminal</option>}{checkpoint.type === 'PIA' && <>{canEnterPia && <option value="ENTREE PIA">Entrée à la PIA</option>}{canExitPia && <option value="SORTIE PIA">Sortie de la PIA</option>}</>}</select></div>

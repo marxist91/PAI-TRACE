@@ -120,6 +120,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
         terminalAffecte: true,
         createdAt: true,
         updatedAt: true,
+        manifeste: { select: { id: true, nomFichier: true, importedAt: true } },
         consignataire: { select: { id: true, nom: true, code: true } },
         client: { select: { id: true, nom: true, prenom: true, email: true } },
       },

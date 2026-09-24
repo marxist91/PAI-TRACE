@@ -43,21 +43,25 @@ const navItems: Array<{ path: string; label: string; icon: Icon }> = [
 
 const terminalNavItems: typeof navItems = [
   { path: '/', label: 'File de contrôle', icon: SquaresFour },
+  { path: '/file-terminal', label: 'Restant à sortir', icon: Clock },
   { path: '/manifestes', label: 'Mes manifestes', icon: FileXls },
   { path: '/quai', label: 'Vue à quai', icon: Anchor },
   { path: '/conteneurs', label: 'Conteneurs', icon: ShippingContainer },
   { path: '/checkpoints', label: 'Sorties terminal', icon: MapPin },
   { path: '/mouvements', label: 'Mouvements', icon: ArrowsLeftRight },
   { path: '/anomalies', label: 'Anomalies', icon: Warning },
+  { path: '/rapports', label: 'Statistiques', icon: ChartBar },
 ];
 
 const piaNavItems: typeof navItems = [
   { path: '/', label: 'Réceptions PIA', icon: SquaresFour },
+  { path: '/sejours', label: 'En séjour', icon: Clock },
   { path: '/conteneurs', label: 'Conteneurs', icon: ShippingContainer },
   { path: '/pia', label: 'Entrées / sorties', icon: Warehouse },
   { path: '/checkpoints', label: 'Contrôles PIA', icon: MapPin },
   { path: '/mouvements', label: 'Mouvements', icon: ArrowsLeftRight },
   { path: '/anomalies', label: 'Anomalies', icon: Warning },
+  { path: '/rapports', label: 'Statistiques', icon: ChartBar },
 ];
 
 const roleLabels: Record<string, string> = {

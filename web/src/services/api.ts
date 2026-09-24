@@ -56,6 +56,7 @@ export interface Consignataire {
 }
 
 export interface Conteneur {
+  manifeste?: { id: number; nomFichier: string; importedAt: string } | null;
   id: number;
   numeroConteneur?: string | null;
   numeroBL: string;

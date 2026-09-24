@@ -23,6 +23,7 @@
     "test:protection-db": "node --import tsx scripts/test-protection-db.ts",
     "test:admin-db": "node --import tsx scripts/test-admin-db.ts",
     "test:auth-db": "node --import tsx scripts/test-auth-db.ts",
+    "test:operational-views-db": "node --import tsx scripts/test-operational-views-db.ts",
     "test:official-db": "node --import tsx scripts/test-official-pia-db.ts"
   },
   "keywords": [],

@@ -141,3 +141,6 @@ body {
 .login-command-card .login-remember { display: flex; align-items: center; gap: 10px; font-size: 15px; margin-block: 16px 8px; }
 .login-command-card .login-remember input { width: 18px; height: 18px; flex: 0 0 18px; accent-color: #ffde00; }
 .login-command-card .login-session-help { font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+.ops-metric-link { display: block; color: inherit; text-decoration: none; }
+.ops-metric-link:hover span { text-decoration: underline; }
+.ops-metric-link:focus-visible { outline: 2px solid #f4d80b; outline-offset: 5px; }

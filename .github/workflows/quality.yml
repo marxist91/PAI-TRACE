@@ -49,6 +49,7 @@ jobs:
       - run: npm run test:protection-db
       - run: npm run test:admin-db
       - run: npm run test:auth-db
+      - run: npm run test:operational-views-db
 
   web:
     name: Web — compilation de production

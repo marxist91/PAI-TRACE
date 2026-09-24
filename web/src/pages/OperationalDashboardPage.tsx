@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { conteneurService, mouvementService, operationService, type Role } from '../services/api';
 import { OpsHeader, OpsMetricStrip, OpsPage, OpsPanel, OpsState } from '../components/OperationsUI';
 import { StatusChip } from '../components/StatusChip';
+import { isPendingTerminal } from '../utils/terminal-queue';
 
 type OperationalRole = Extract<Role, 'CONTROLEUR_LCT' | 'CONTROLEUR_TOGO' | 'AGENT_PIA'>;
 
@@ -74,9 +75,9 @@ export default function OperationalDashboardPage() {
   const movements = movementsQuery.data?.data.mouvements ?? [];
   const stats = statsQuery.data?.data.stats;
   const active = containers
-    .filter((item) => config.activeStatuses.includes(item.statut))
+    .filter((item) => role === 'AGENT_PIA' ? item.statut === 'SORTI_TERMINAL' && !item.dateEntreePia : isPendingTerminal(item))
     .sort((left, right) => {
-      if (role !== 'AGENT_PIA') return 0;
+      if (role !== 'AGENT_PIA') return Date.parse(left.createdAt) - Date.parse(right.createdAt) || left.id - right.id;
       if (left.statut === right.statut) {
         return new Date(right.updatedAt || right.dateSortieTerminal || right.dateEntreePia || 0).getTime()
           - new Date(left.updatedAt || left.dateSortieTerminal || left.dateEntreePia || 0).getTime();
@@ -85,14 +86,14 @@ export default function OperationalDashboardPage() {
     });
   const isTerminal = role === 'CONTROLEUR_LCT' || role === 'CONTROLEUR_TOGO';
   const metricItems = isTerminal ? [
-    { label: 'Conteneurs suivis', value: containers.length, icon: ShippingContainer },
+    { label: 'Restant à sortir', value: active.length, icon: ShippingContainer, to: '/file-terminal' },
     { label: 'Vus à quai aujourd’hui', value: stats?.vusAQuai ?? 0, icon: Anchor },
     { label: 'Sorties enregistrées', value: stats?.sortiesTerminal ?? 0, icon: Truck, tone: 'warning' as const },
     { label: 'Attendus par la PIA', value: stats?.attendus ?? 0, icon: HouseLine, tone: 'success' as const },
   ] : [
     { label: 'En route vers la PIA', value: active.filter((item) => item.statut === 'SORTI_TERMINAL').length, icon: Truck, tone: 'warning' as const },
     { label: 'Entrées aujourd’hui', value: stats?.entreesPia ?? 0, icon: HouseLine },
-    { label: 'En séjour', value: stats?.enSejour ?? 0, icon: Clock, tone: 'warning' as const },
+    { label: 'En séjour', value: stats?.enSejour ?? 0, icon: Clock, tone: 'warning' as const, to: '/sejours' },
     { label: 'Sorties aujourd’hui', value: stats?.sortiesPia ?? 0, icon: CheckCircle, tone: 'success' as const },
   ];
   const isLoading = containersQuery.isLoading || movementsQuery.isLoading || statsQuery.isLoading;
@@ -108,12 +109,13 @@ export default function OperationalDashboardPage() {
     </section>
 
     <OpsMetricStrip items={metricItems} />
+    <div className="ops-inline-actions"><Link className="ops-button" to={isTerminal ? '/file-terminal' : '/sejours'}>{isTerminal ? 'Voir tous les conteneurs restant à sortir' : 'Voir tous les conteneurs en séjour'}</Link><Link className="ops-button" to="/rapports">Statistiques de mon poste</Link></div>
 
     <div className="operational-dashboard-grid">
-      <OpsPanel title={config.queueTitle} subtitle={config.queueSubtitle} action={<Link to="/conteneurs" className="ops-button">Toute la file</Link>}>
+      <OpsPanel title={config.queueTitle} subtitle={isTerminal ? 'Restant à sortir, les premiers enregistrés en tête' : config.queueSubtitle} action={<Link to={isTerminal ? '/file-terminal' : '/pia'} className="ops-button">Toute la file</Link>}>
         {isLoading ? <OpsState icon={config.icon} title="Chargement de la file" />
           : isError ? <OpsState icon={WarningCircle} title="File indisponible" tone="danger" />
-            : active.length === 0 ? <OpsState icon={CheckCircle} title="Aucune unité à traiter" description="La file de votre checkpoint est à jour." />
+            : active.length === 0 ? <OpsState icon={CheckCircle} title={isTerminal ? 'Aucune unité restant à sortir' : 'Aucune entrée à valider'} description={isTerminal ? 'La file de votre checkpoint est à jour.' : 'Les conteneurs déjà reçus sont accessibles dans En séjour.'} />
               : <div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Conteneur / B/L</th><th>ATP</th><th>Terminal</th><th>Statut</th><th>Action</th></tr></thead><tbody>
                 {active.slice(0, 8).map((item) => {
                   const isExpectedAtPia = role === 'AGENT_PIA' && item.statut === 'SORTI_TERMINAL';
