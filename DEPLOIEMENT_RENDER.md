@@ -29,6 +29,11 @@ Le fichier `render.yaml` désactive les déploiements automatiques après public
 4. Renseigner `DATABASE_URL` directement dans le champ secret Render avec la connexion
    PostgreSQL de la base Prisma choisie (conserver les options SSL fournies par Prisma).
    Ne pas envoyer cette URL dans une conversation ni la committer.
+   Le runtime rend explicite `sslmode=verify-full` pour les anciens alias pg
+   `prefer`, `require` et `verify-ca`, sans changer leur validation actuelle.
+   Les certificats et autres options sont conservés ; les connexions locales sans SSL
+   et le mode explicitement demandé `uselibpqcompat=true` restent inchangés.
+   Cette normalisation concerne le runtime Node, pas les commandes Prisma de migration.
 5. Les deux secrets JWT sont générés séparément par Render. Ne pas recopier ceux de
    développement. `RENDER_EXTERNAL_URL` est fourni par Render ; il sert d'origine CORS.
 6. Lancer le déploiement initial. Aucun seed, suppression ou migration automatique

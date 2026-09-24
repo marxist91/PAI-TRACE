@@ -1,22 +1,25 @@
+import { lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import PageLoader from './components/PageLoader';
 import { useAuth } from './contexts/AuthContext';
-import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
-import ConteneursPage from './pages/ConteneursPage';
-import ConteneurDetailPage from './pages/ConteneurDetailPage';
-import ConteneurFormPage from './pages/ConteneurFormPage';
-import CheckpointsPage from './pages/CheckpointsPage';
-import RapportsPage from './pages/RapportsPage';
-import MouvementsPage from './pages/MouvementsPage';
-import AnomaliesPage from './pages/AnomaliesPage';
-import UtilisateursPage from './pages/UtilisateursPage';
-import ParametresPage from './pages/ParametresPage';
-import OperationalDashboardPage from './pages/OperationalDashboardPage';
-import PilotagePage from './pages/PilotagePage';
-import ManifestesPage from './pages/ManifestesPage';
-import QuaiPage from './pages/QuaiPage';
-import PiaOperationsPage from './pages/PiaOperationsPage';
 import type { Role } from './services/api';
+
+const Layout = lazy(() => import('./components/Layout'));
+const ConteneursPage = lazy(() => import('./pages/ConteneursPage'));
+const ConteneurDetailPage = lazy(() => import('./pages/ConteneurDetailPage'));
+const ConteneurFormPage = lazy(() => import('./pages/ConteneurFormPage'));
+const CheckpointsPage = lazy(() => import('./pages/CheckpointsPage'));
+const RapportsPage = lazy(() => import('./pages/RapportsPage'));
+const MouvementsPage = lazy(() => import('./pages/MouvementsPage'));
+const AnomaliesPage = lazy(() => import('./pages/AnomaliesPage'));
+const UtilisateursPage = lazy(() => import('./pages/UtilisateursPage'));
+const ParametresPage = lazy(() => import('./pages/ParametresPage'));
+const OperationalDashboardPage = lazy(() => import('./pages/OperationalDashboardPage'));
+const PilotagePage = lazy(() => import('./pages/PilotagePage'));
+const ManifestesPage = lazy(() => import('./pages/ManifestesPage'));
+const QuaiPage = lazy(() => import('./pages/QuaiPage'));
+const PiaOperationsPage = lazy(() => import('./pages/PiaOperationsPage'));
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -46,6 +49,7 @@ function RoleHome() {
 
 export default function App() {
   return (
+    <PageLoader>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
@@ -72,5 +76,6 @@ export default function App() {
         <Route path="parametres" element={<RoleRoute roles={['ADMIN']}><ParametresPage /></RoleRoute>} />
       </Route>
     </Routes>
+    </PageLoader>
   );
 }

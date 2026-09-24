@@ -1,5 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
+import { normalizeDatabaseSsl } from './database-url';
 import { PrismaClient } from '../generated/prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
@@ -14,7 +15,7 @@ const prismaClientSingleton = () => {
   }
 
   const pool = new pg.Pool({
-    connectionString,
+    connectionString: normalizeDatabaseSsl(connectionString),
     max: 10,
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,

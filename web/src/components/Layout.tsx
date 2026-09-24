@@ -25,6 +25,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { notificationService } from '../services/api';
 import { createRealtimeSocket } from '../services/realtime';
 import NotificationCenter from './NotificationCenter';
+import PageLoader from './PageLoader';
 
 const navItems: Array<{ path: string; label: string; icon: Icon }> = [
   { path: '/', label: 'Pilotage', icon: SquaresFour },
@@ -190,7 +191,7 @@ export default function Layout() {
             </button>
           </div>
         </header>
-        <main className="command-main"><Outlet /></main>
+        <main className="command-main"><PageLoader key={location.pathname}><Outlet /></PageLoader></main>
       </div>
       <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
     </div>
