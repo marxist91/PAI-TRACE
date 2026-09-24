@@ -1,0 +1,101 @@
+import 'dotenv/config';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import bcrypt from 'bcrypt';
+import request from 'supertest';
+
+async function main() {
+  const target = process.env.TEST_DATABASE_URL;
+  assert.ok(target, 'TEST_DATABASE_URL obligatoire');
+  const url = new URL(target);
+  assert.ok(['postgres:', 'postgresql:'].includes(url.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+  assert.match(url.pathname, /^\/pia_trace_test(?:_[a-z0-9]+)?$/);
+  if (process.env.DATABASE_URL) {
+    const source = new URL(process.env.DATABASE_URL);
+    assert.ok(!(['localhost','127.0.0.1','[::1]'].includes(source.hostname) && (source.port || '5432') === (url.port || '5432') && source.pathname === url.pathname), 'Base applicative interdite');
+  }
+  process.env.DATABASE_URL = target;
+  const { prisma } = await import('../src/lib/prisma');
+  const { createApp } = await import('../src/app');
+  const { generateAccessToken, generateRefreshToken, verifyRefreshToken, createRefreshToken } = await import('../src/middleware/auth');
+  const app = createApp();
+  const ids: number[] = [];
+  const password = `Test-${randomUUID()}`;
+  const email = `session-${randomUUID()}@example.invalid`;
+  const login = (extra = {}) => request(app).post('/api/auth/login').send({ email, password, ...extra });
+  const me = (token: string) => request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+  try {
+    const user = await prisma.user.create({ data: { email, password: await bcrypt.hash(password, 10), nom: 'Test', prenom: 'Session', role: 'LOGISTICIEN' } }); ids.push(user.id);
+    const legacyAccess = generateAccessToken(user);
+    const legacyRefresh = generateRefreshToken(user);
+    await prisma.refreshToken.create({ data: { userId: user.id, token: legacyRefresh, expiresAt: new Date(Date.now()+86400_000) } });
+    assert.equal((await me(legacyAccess)).status, 401);
+    assert.equal((await request(app).post('/api/auth/refresh').send({ refreshToken: legacyRefresh })).status, 401);
+    assert.equal((await login({ password: 'incorrect' })).status, 401);
+    assert.equal((await login({ rememberMe: 'yes' })).status, 400);
+    const attempts = await Promise.all([login(), login()]);
+    assert.deepEqual(attempts.map(r=>r.status).sort(), [200,409]);
+    const session = attempts.find(r=>r.status===200)!.body;
+    assert.equal((await me(session.accessToken)).status, 200);
+    assert.equal((await login()).status, 409);
+    assert.equal(await prisma.refreshToken.count({ where: { userId: user.id } }), 1);
+    const active = await prisma.refreshToken.findUniqueOrThrow({ where: { token: session.refreshToken } });
+    assert.ok(active.expiresAt.getTime()-Date.now() > 7.9*3600_000 && active.expiresAt.getTime()-Date.now() <= 8*3600_000);
+    const refreshed = await request(app).post('/api/auth/refresh').send({ refreshToken: session.refreshToken });
+    assert.equal(refreshed.status, 200); assert.equal((await me(refreshed.body.accessToken)).status, 200);
+    assert.equal((await request(app).post('/api/auth/logout').send({ refreshToken: session.refreshToken })).status, 200);
+    assert.equal((await me(session.accessToken)).status, 401);
+    assert.equal((await me(refreshed.body.accessToken)).status, 401);
+    assert.equal((await request(app).post('/api/auth/refresh').send({ refreshToken: session.refreshToken })).status, 401);
+    const remembered = (await login({ rememberMe: true })).body;
+    const lasting = await prisma.refreshToken.findUniqueOrThrow({ where: { token: remembered.refreshToken } });
+    assert.ok(lasting.expiresAt.getTime()-Date.now() > 6.9*86400_000);
+    // Replaying an old logout cannot revoke the new session.
+    await request(app).post('/api/auth/logout').send({ refreshToken: session.refreshToken });
+    assert.equal((await me(remembered.accessToken)).status, 200);
+    assert.equal((await request(app).post(`/api/users/${user.id}/revoke-session`).set('Authorization', `Bearer ${remembered.accessToken}`)).status, 403);
+    const admin = await prisma.user.create({ data: { email: `admin-${randomUUID()}@example.invalid`, password: 'unusable', nom:'Test', prenom:'Admin', role:'ADMIN' } }); ids.push(admin.id);
+    const adminToken = generateAccessToken(verifyRefreshToken(await createRefreshToken(admin.id)));
+    assert.equal((await request(app).post(`/api/users/${user.id}/revoke-session`).set('Authorization', `Bearer ${adminToken}`)).status, 200);
+    assert.equal((await me(remembered.accessToken)).status, 401);
+    const renewed = (await login()).body;
+    assert.equal((await me(renewed.accessToken)).status, 200);
+    await prisma.refreshToken.update({ where: { token: renewed.refreshToken }, data: { expiresAt: new Date(0) } });
+    assert.equal((await me(renewed.accessToken)).status, 401);
+    assert.equal((await login()).status, 200);
+    const latest = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    const status = (id: number, isActive: boolean, updatedAt: string, token = adminToken) => request(app).patch(`/api/users/${id}/status`).set('Authorization', `Bearer ${token}`).send({ isActive, updatedAt });
+    const remove = (id: number, updatedAt: string, token = adminToken) => request(app).delete(`/api/users/${id}`).set('Authorization', `Bearer ${token}`).send({ updatedAt });
+    const existingSession = await prisma.refreshToken.findFirstOrThrow({ where: { userId: user.id } });
+    const existingAccess = generateAccessToken(verifyRefreshToken(existingSession.token));
+    assert.equal((await status(user.id, false, latest.updatedAt.toISOString(), existingAccess)).status, 403);
+    assert.equal((await remove(user.id, latest.updatedAt.toISOString(), existingAccess)).status, 403);
+    assert.equal((await status(admin.id, false, admin.updatedAt.toISOString())).status, 409);
+    assert.equal((await remove(admin.id, admin.updatedAt.toISOString())).status, 409);
+    const disabled = await status(user.id, false, latest.updatedAt.toISOString());
+    assert.equal(disabled.status, 200); assert.equal(disabled.body.user.isActive, false);
+    assert.equal((await me(existingAccess)).status, 401);
+    assert.notEqual((await login()).status, 200);
+    assert.equal(await prisma.refreshToken.count({ where: { userId: user.id } }), 0);
+    assert.equal((await status(user.id, true, latest.updatedAt.toISOString())).status, 409);
+    assert.equal((await remove(user.id, latest.updatedAt.toISOString())).status, 409);
+    const enabled = await status(user.id, true, disabled.body.user.updatedAt);
+    assert.equal(enabled.status, 200);
+    const finalSession = await login(); assert.equal(finalSession.status, 200);
+    await prisma.notification.create({ data: { userId: user.id, message: 'Fixture historique', type: 'INFO' } });
+    assert.equal((await remove(user.id, enabled.body.user.updatedAt)).status, 409);
+    assert.equal(await prisma.notification.count({ where: { userId: user.id } }), 1);
+    await prisma.notification.deleteMany({ where: { userId: user.id } });
+    assert.equal((await remove(user.id, enabled.body.user.updatedAt)).status, 200);
+    assert.equal(await prisma.user.findUnique({ where: { id: user.id } }), null);
+    assert.equal((await me(finalSession.body.accessToken)).status, 401);
+    assert.equal(await prisma.refreshToken.count({ where: { userId: user.id } }), 0);
+    console.log('OK authentification et comptes : sessions, désactivation/réactivation, suppression, droits, historique conservé, protection du compte connecté et conflits.');
+  } finally {
+    await prisma.notification.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.refreshToken.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    await prisma.$disconnect();
+  }
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

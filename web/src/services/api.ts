@@ -11,6 +11,7 @@ const api = axios.create({
 export interface LoginRequest {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }
 
 export interface RegisterRequest {
@@ -244,7 +245,7 @@ export interface ManifestePreview {
 // Auth
 export const authService = {
   login: (data: LoginRequest) => api.post<AuthResponse>('/auth/login', data),
-  register: (data: RegisterRequest) => api.post<AuthResponse>('/auth/register', data),
+  register: (data: RegisterRequest) => api.post<{ user: User }>('/auth/register', data),
   logout: (refreshToken: string | null) =>
     refreshToken ? api.post('/auth/logout', { refreshToken }) : Promise.resolve(),
   refresh: (refreshToken: string) => api.post<{ accessToken: string }>('/auth/refresh', { refreshToken }),
@@ -322,6 +323,9 @@ export interface CurrentPiaStock {
 }
 
 export const userService = {
+  revokeSession: (id: number) => api.post(`/users/${id}/revoke-session`),
+  setActive: (id: number, isActive: boolean, updatedAt: string) => api.patch(`/users/${id}/status`, { isActive, updatedAt }),
+  remove: (id: number, updatedAt: string) => api.delete(`/users/${id}`, { data: { updatedAt } }),
   getAll: () => api.get<{ users: UserSummary[] }>('/users'),
   create: (data: RegisterRequest & { isActive: boolean }) => api.post<{ user: UserSummary }>('/users', data),
   update: (id: number, data: Omit<RegisterRequest, 'password'> & { password?: string; isActive: boolean; updatedAt: string }) => api.put<{ user: UserSummary; sessionRevoked: boolean }>(`/users/${id}`, data),

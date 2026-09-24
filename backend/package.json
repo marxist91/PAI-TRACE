@@ -16,11 +16,13 @@
     "db:demo:clean": "tsx prisma/clean-demo.ts",
     "db:demo:clean-future": "tsx prisma/clean-future-demo.ts",
     "db:cleanup-tokens": "tsx scripts/cleanup-expired-tokens.ts",
+    "db:backup:verify": "node scripts/backup-verify.mjs",
     "lint": "eslint src --ext .ts",
     "test": "tsx --test src/**/*.test.ts",
     "test:workflow": "tsx scripts/test-full-workflow.ts",
     "test:protection-db": "node --import tsx scripts/test-protection-db.ts",
     "test:admin-db": "node --import tsx scripts/test-admin-db.ts",
+    "test:auth-db": "node --import tsx scripts/test-auth-db.ts",
     "test:official-db": "node --import tsx scripts/test-official-pia-db.ts"
   },
   "keywords": [],

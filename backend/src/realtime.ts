@@ -29,6 +29,10 @@ export function initializeRealtime(server: HttpServer) {
       const token = socket.handshake.auth?.token;
       if (!token || typeof token !== 'string') throw new Error('Token manquant');
       const decoded = verifyAccessToken(token);
+      if (!decoded.sessionId) throw new Error('Session expirée');
+      const session = await prisma.refreshToken.findFirst({ where: { id: decoded.sessionId, userId: decoded.id, expiresAt: { gt: new Date() } } });
+      if (!session) throw new Error('Session expirée');
+      socket.data.sessionExpiresAt = session.expiresAt.getTime();
       const user = await prisma.user.findUnique({ where: { id: decoded.id } });
       if (!user?.isActive || user.tokenVersion !== (decoded.tokenVersion ?? 0)) throw new Error('Session révoquée');
       socket.data.user = { id: user.id, role: user.role };
@@ -39,6 +43,8 @@ export function initializeRealtime(server: HttpServer) {
   });
 
   io.on('connection', (socket) => {
+    const timer = setTimeout(() => socket.disconnect(true), Math.max(0, socket.data.sessionExpiresAt - Date.now()));
+    socket.on('disconnect', () => clearTimeout(timer));
     const user = socket.data.user as { id: number; role: string };
     socket.join('authenticated');
     socket.join(`user:${user.id}`);

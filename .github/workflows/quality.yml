@@ -39,6 +39,8 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=moderate
       - run: npm test
+      - name: Tests frontend de session et règles métier
+        run: npx tsx --test ../web/tests/*.test.ts
       - run: npm run build
       - name: Installer le schéma de recette isolée
         run: npx prisma migrate deploy
@@ -46,6 +48,7 @@ jobs:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/pia_trace_test
       - run: npm run test:protection-db
       - run: npm run test:admin-db
+      - run: npm run test:auth-db
 
   web:
     name: Web — compilation de production

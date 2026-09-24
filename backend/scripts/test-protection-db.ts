@@ -18,7 +18,7 @@ async function main() {
   process.env.DATABASE_URL = target;
   const { prisma } = await import('../src/lib/prisma');
   const { createApp } = await import('../src/app');
-  const { generateAccessToken } = await import('../src/middleware/auth');
+  const { generateAccessToken, createRefreshToken, verifyRefreshToken } = await import('../src/middleware/auth');
   const app = createApp();
   const run = randomUUID();
   const userIds: number[] = [];
@@ -52,7 +52,7 @@ async function main() {
     for (const role of ['LOGISTICIEN', 'CONTROLEUR_LCT', 'CONTROLEUR_TOGO', 'AGENT_PIA', 'CLIENT', 'CONSIGNATAIRE'] as Role[]) {
       const actor = await prisma.user.create({ data: { email: `protection-${run}-${role}@example.invalid`, password: 'INUTILISABLE_TEST', nom: 'Recette', prenom: role, role } });
       userIds.push(actor.id);
-      tokens.set(role, generateAccessToken(actor));
+      tokens.set(role, generateAccessToken(verifyRefreshToken(await createRefreshToken(actor.id))));
     }
     const company = await prisma.consignataire.create({ data: { nom: `Protection ${run}`, code: run } });
     companyId = company.id;

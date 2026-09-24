@@ -92,6 +92,7 @@ export default function Layout() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
   const notificationsQuery = useQuery({
     queryKey: ['notifications'],
     queryFn: () => notificationService.getAll({ limit: 30 }),
@@ -135,8 +136,10 @@ export default function Layout() {
     : activeNavItems.find((item) => item.path !== '/' && location.pathname.startsWith(item.path))?.label ?? 'PIA-TRACE';
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    try {
+      await logout();
+      navigate('/login');
+    } catch { setLogoutError('Déconnexion non confirmée par le serveur. Vérifiez la connexion et réessayez.'); }
   };
 
   return (
@@ -191,7 +194,7 @@ export default function Layout() {
             </button>
           </div>
         </header>
-        <main className="command-main"><PageLoader key={location.pathname}><Outlet /></PageLoader></main>
+        <main className="command-main">{logoutError && <p role="alert">{logoutError}</p>}<PageLoader key={location.pathname}><Outlet /></PageLoader></main>
       </div>
       <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
     </div>

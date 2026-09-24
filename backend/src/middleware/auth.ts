@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { validateProductionSecrets } from '../services/deployment-config';
 
@@ -26,21 +27,22 @@ export interface TokenPayload {
   email: string;
   role: string;
   tokenVersion?: number;
+  sessionId?: string;
 }
 
 export function generateAccessToken(user: TokenPayload): string {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, tokenVersion: user.tokenVersion ?? 0 },
+    { id: user.id, email: user.email, role: user.role, tokenVersion: user.tokenVersion ?? 0, sessionId: user.sessionId },
     JWT_SECRET,
     { expiresIn: ACCESS_TOKEN_EXPIRY },
   );
 }
 
-export function generateRefreshToken(user: TokenPayload): string {
+export function generateRefreshToken(user: TokenPayload, rememberMe = false): string {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, tokenVersion: user.tokenVersion ?? 0 },
+    { id: user.id, email: user.email, role: user.role, tokenVersion: user.tokenVersion ?? 0, sessionId: user.sessionId },
     JWT_REFRESH_SECRET,
-    { expiresIn: `${REFRESH_TOKEN_EXPIRY_DAYS}d` },
+    { expiresIn: rememberMe ? `${REFRESH_TOKEN_EXPIRY_DAYS}d` : '8h' },
   );
 }
 
@@ -52,33 +54,42 @@ export function verifyAccessToken(token: string): TokenPayload {
   return jwt.verify(token, JWT_SECRET) as TokenPayload;
 }
 
-export async function createRefreshToken(userId: number): Promise<string> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, role: true, tokenVersion: true },
-  });
+export class ActiveSessionError extends Error {}
 
-  if (!user) {
-    throw new Error('Utilisateur non trouvé');
-  }
-
-  const token = generateRefreshToken(user);
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS);
-
-  await prisma.refreshToken.create({
-    data: {
-      token,
-      userId,
-      expiresAt,
-    },
-  });
-
-  return token;
+export async function createRefreshToken(userId: number, rememberMe = false, verifiedPasswordHash?: string): Promise<string> {
+  return prisma.$transaction(async tx => {
+    // A per-user lock serializes concurrent logins, logout and revocation.
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+    const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!user.isActive || (verifiedPasswordHash && user.password !== verifiedPasswordHash)) throw new Error('Compte modifié pendant la connexion');
+    const sessions = await tx.refreshToken.findMany({ where: { userId, expiresAt: { gt: new Date() } } });
+    for (const session of sessions) {
+      let decoded: TokenPayload;
+      try { decoded = verifyRefreshToken(session.token); } catch { continue; }
+      if (decoded.sessionId === session.id && decoded.tokenVersion === user.tokenVersion) {
+        throw new ActiveSessionError('Ce compte possède déjà une session active. Déconnectez-vous sur l’autre appareil ou contactez un administrateur.');
+      }
+    }
+    // Legacy sessions (without sessionId) are rejected by authentication after deployment.
+    await tx.refreshToken.deleteMany({ where: { userId } });
+    const current = await tx.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 }, updatedAt: user.updatedAt } });
+    const sessionId = randomUUID();
+    const token = generateRefreshToken({ ...current, sessionId }, rememberMe);
+    const expiresAt = new Date(Date.now() + (rememberMe ? REFRESH_TOKEN_EXPIRY_DAYS * 24 : 8) * 3600_000);
+    await tx.refreshToken.create({ data: { id: sessionId, token, userId, expiresAt } });
+    return token;
+  }, { isolationLevel: 'ReadCommitted' });
 }
 
-export async function revokeRefreshToken(token: string): Promise<void> {
-  await prisma.refreshToken.deleteMany({ where: { token } });
+export async function revokeRefreshToken(token: string): Promise<number | null> {
+  const session = await prisma.refreshToken.findUnique({ where: { token } });
+  if (!session) return null;
+  return prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${session.userId} FOR UPDATE`;
+    const deleted = await tx.refreshToken.deleteMany({ where: { id: session.id, token } });
+    if (deleted.count) await tx.$executeRaw`UPDATE "User" SET "tokenVersion" = "tokenVersion" + 1 WHERE id = ${session.userId}`;
+    return deleted.count ? session.userId : null;
+  });
 }
 
 export async function revokeAllUserRefreshTokens(userId: number): Promise<void> {
@@ -99,6 +110,9 @@ export async function authenticate(
 
     const token = authHeader.split(' ')[1];
     const decoded = verifyAccessToken(token);
+    if (!decoded.sessionId || !await prisma.refreshToken.findFirst({ where: { id: decoded.sessionId, userId: decoded.id, expiresAt: { gt: new Date() } } })) {
+      res.status(401).json({ error: 'Session expirée ou révoquée. Reconnectez-vous.' }); return;
+    }
 
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user || !user.isActive || user.tokenVersion !== (decoded.tokenVersion ?? 0)) {

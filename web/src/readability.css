@@ -137,3 +137,7 @@ body {
   .ops-metric strong { font-size: 24px; }
   .login-command-form { padding: 24px 20px; }
 }
+/* Login preference: never stretch the checkbox like a text field. */
+.login-command-card .login-remember { display: flex; align-items: center; gap: 10px; font-size: 15px; margin-block: 16px 8px; }
+.login-command-card .login-remember input { width: 18px; height: 18px; flex: 0 0 18px; accent-color: #ffde00; }
+.login-command-card .login-session-help { font-size: 13px; line-height: 1.5; margin-bottom: 16px; }

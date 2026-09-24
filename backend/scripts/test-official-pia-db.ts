@@ -58,9 +58,9 @@ async function main() {
     assert.deepEqual(await prisma.conteneur.findUnique({ where: { id: before.id } }), snapshot);
     console.log('OK PostgreSQL : réimport identique, conservation BL/dates/ordre, aucun doublon, annulation du lot en conflit.');
     const { createApp } = await import('../src/app');
-    const { generateAccessToken } = await import('../src/middleware/auth');
+    const { generateAccessToken, createRefreshToken, verifyRefreshToken } = await import('../src/middleware/auth');
     const app = createApp();
-    const token = generateAccessToken(actor);
+    const token = generateAccessToken(verifyRefreshToken(await createRefreshToken(actor.id)));
     const xml = (flags: string) => Buffer.from(`<Interchanges><MessageSet><Messages><Notification type="DAD" action="CREATE"><liste-apd><apd><voyage-mani atp="ATP-RECETTE"/><navire-mani nom="TEST SYNTHETIQUE"/><principal-mani-lieu manut="LCT"><principal-mani num="BL-XML-TEST" ${flags}><equipement-mani id="${numbers[1]}"/></principal-mani></principal-mani-lieu></apd></liste-apd></Notification></Messages></MessageSet></Interchanges>`);
     const positive = xml('transit="N" pia="Y"');
     const missingDate = await request(app).post('/api/manifestes/import').set('Authorization', `Bearer ${token}`).attach('fichier', positive, 'synthetique.xml');

@@ -13,6 +13,8 @@ import {
   ShieldCheck,
   Users,
   WarningCircle,
+  Prohibit,
+  Trash,
 } from '@phosphor-icons/react';
 import { userService, type UserSummary, type Role } from '../services/api';
 import { OpsHeader, OpsMetricStrip, OpsPage, OpsPanel, OpsState } from '../components/OperationsUI';
@@ -42,9 +44,36 @@ export default function UtilisateursPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  async function releaseSession(user: UserSummary) {
+    if (!window.confirm(`Déconnecter ${user.prenom} ${user.nom} et libérer sa session ?`)) return;
+    setPending(true); setMessage(''); setError('');
+    try {
+      await userService.revokeSession(user.id);
+      setMessage('Session libérée. Le compte peut se reconnecter.');
+      await cache.invalidateQueries({ queryKey: ['users'] });
+      if (user.id === currentUser?.id) await logout();
+    } catch { setError('Impossible de libérer la session. Réessayez.'); }
+    finally { setPending(false); }
+  }
   function openEditor(user: UserSummary | 'new') {
     setEditor(user); setError(''); setMessage(''); setShowPassword(false);
     setForm(user === 'new' ? emptyForm : { nom: user.nom, prenom: user.prenom, email: user.email, telephone: user.telephone || '', role: user.role, password: '', isActive: user.isActive });
+  }
+  async function changeAccount(user: UserSummary, remove = false) {
+    if (pending || user.id === currentUser?.id) return;
+    const name = `${user.prenom} ${user.nom}`;
+    const confirmation = remove
+      ? `Supprimer définitivement le compte de ${name} ? Cette action est irréversible et sera refusée si un historique est associé au compte.`
+      : user.isActive ? `Désactiver ${name} ? Son accès sera bloqué et sa session fermée. L’historique sera conservé.` : `Réactiver le compte de ${name} ?`;
+    if (!window.confirm(confirmation)) return;
+    setPending(true); setError(''); setMessage('');
+    try {
+      if (remove) await userService.remove(user.id, user.updatedAt);
+      else await userService.setActive(user.id, !user.isActive, user.updatedAt);
+      setMessage(remove ? 'Compte supprimé.' : user.isActive ? 'Compte désactivé et session fermée.' : 'Compte réactivé.');
+      setEditor(null);
+    } catch (e) { setError(isAxiosError(e) ? e.response?.data?.error || 'Action impossible.' : 'Action impossible.'); }
+    finally { await cache.invalidateQueries({ queryKey: ['users'] }); setPending(false); }
   }
   async function save(event: React.FormEvent) {
     event.preventDefault(); if (!editor || pending) return;
@@ -78,6 +107,7 @@ export default function UtilisateursPage() {
     <OpsPage>
       <OpsHeader title="Agents et accès" subtitle="Créer des comptes et attribuer les droits par rôle opérationnel" actions={<><button className="ops-button" onClick={() => query.refetch()}><ArrowClockwise size={15} /> Actualiser</button><button className="ops-button ops-button-primary" disabled={pending} onClick={() => openEditor('new')}>Créer un utilisateur</button></>} />
       {message && <p role="status">{message}</p>}
+      {error && !editor && <p role="alert">{error}</p>}
       {editor && <OpsPanel title={editor === 'new' ? 'Nouveau compte' : `Modifier ${editor.prenom} ${editor.nom}`} subtitle="Les droits sont appliqués côté serveur. Aucun mot de passe existant n’est affiché.">
         <form className="admin-form" onSubmit={save}>
           <fieldset disabled={pending}>
@@ -112,7 +142,7 @@ export default function UtilisateursPage() {
               <td>{user.telephone || 'Non renseigné'}</td>
               <td className="ops-mono">{user._count.mouvements.toLocaleString('fr-FR')}</td>
               <td>{user.isActive ? 'Actif' : 'Désactivé'}</td>
-              <td><button className="ops-button" disabled={pending} onClick={() => openEditor(user)}>Modifier</button></td>
+              <td><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}><button className="ops-button" disabled={pending} onClick={() => openEditor(user)}>Modifier</button><button className="ops-button" disabled={pending} onClick={() => releaseSession(user)}>Libérer la session</button><button className="ops-button" disabled={pending || user.id === currentUser?.id} onClick={() => changeAccount(user)}>{user.isActive ? <Prohibit size={16} /> : <CheckCircle size={16} />}{user.isActive ? 'Désactiver' : 'Réactiver'}</button><button className="ops-button" disabled={pending || user.id === currentUser?.id} onClick={() => changeAccount(user, true)}><Trash size={16} /> Supprimer</button></div></td>
             </tr>)}</tbody>
           </table></div>}
       </OpsPanel>

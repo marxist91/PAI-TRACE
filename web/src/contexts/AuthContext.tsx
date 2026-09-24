@@ -1,17 +1,8 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-} from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import api, {
-  authService,
-  LoginRequest,
-  RegisterRequest,
-  User,
-} from '../services/api';
+import api, { authService, type LoginRequest, type RegisterRequest, type User, type AuthResponse } from '../services/api';
+import { clearStoredSession, readStoredSession, writeStoredSession } from '../utils/auth-storage';
 
 interface AuthContextType {
   user: User | null;
@@ -22,186 +13,103 @@ interface AuthContextType {
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
 }
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'pia_web_access_token',
-  REFRESH_TOKEN: 'pia_web_refresh_token',
-  USER: 'pia_web_user',
-};
-
+type Session = AuthResponse & { rememberMe: boolean };
 type RetryableRequest = InternalAxiosRequestConfig & { _retry?: boolean };
-let accessTokenRefresh: Promise<string> | null = null;
-
-function getTokenExpiry(token: string): number | null {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.exp ? payload.exp * 1000 : null;
-  } catch {
-    return null;
-  }
-}
+const LOGOUT_EVENT = 'pia_web_logout';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
+  const current = useRef<Session | null>(null);
+  const generation = useRef(0);
+  const refreshing = useRef<Promise<string> | null>(null);
+  const cache = useQueryClient();
   const clearSession = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    setAccessToken(null);
-    setRefreshToken(null);
-    setUser(null);
+    generation.current++;
+    current.current = null;
+    clearStoredSession();
+    setSession(null);
+    cache.clear();
+  }, [cache]);
+  const saveSession = useCallback((value: Session) => {
+    writeStoredSession(value, value.rememberMe);
+    current.current = value;
+    setSession(value);
   }, []);
-
-  const scheduleAutoLogout = useCallback(
-    (token: string) => {
-      const expiry = getTokenExpiry(token);
-      if (!expiry) return;
-      const delay = expiry - Date.now();
-      if (delay <= 0) {
-        logout();
-        return;
-      }
-      setTimeout(() => logout(), delay);
-    },
-    [clearSession],
-  );
-
   useEffect(() => {
-    const storedAccessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    const storedRefreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-    const storedUser = localStorage.getItem(STORAGE_KEYS.USER);
-
-    if (storedAccessToken && storedRefreshToken && storedUser) {
-      try {
-        const parsedUser: User = JSON.parse(storedUser);
-        if (!parsedUser?.id || !parsedUser.email) {
-          throw new Error('Session utilisateur invalide');
-        }
-        setAccessToken(storedAccessToken);
-        setRefreshToken(storedRefreshToken);
-        setUser(parsedUser);
-        scheduleAutoLogout(storedRefreshToken);
-      } catch {
-        clearSession();
-      }
-    }
-
-    setIsLoading(false);
-  }, [clearSession, scheduleAutoLogout]);
-
+    let cancelled = false;
+    const version = generation.current;
+    const saved = readStoredSession();
+    if (!saved) { setIsLoading(false); return; }
+    // A cached profile never grants access without server validation.
+    authService.refresh(saved.refreshToken).then(async response => {
+      const token = response.data.accessToken;
+      const result = await api.get<{ user: User }>('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+      if (!cancelled && generation.current === version) saveSession({ ...saved, accessToken: token, user: result.data.user });
+    }).catch(() => { if (!cancelled && generation.current === version) clearSession(); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [clearSession, saveSession]);
+  const logout = useCallback(async () => {
+    const token = current.current?.refreshToken;
+    // Do not pretend the server session is released if the network request fails.
+    if (token) await authService.logout(token);
+    clearSession();
+    localStorage.setItem(LOGOUT_EVENT, String(Date.now()));
+  }, [clearSession]);
+  useEffect(() => {
+    if (!session) return;
+    let expiry: number;
+    try { expiry = JSON.parse(atob(session.refreshToken.split('.')[1])).exp * 1000; }
+    catch { clearSession(); return; }
+    if (!Number.isFinite(expiry)) { clearSession(); return; }
+    const timer = window.setTimeout(clearSession, Math.max(0, expiry - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [session, clearSession]);
+  useEffect(() => {
+    const listener = (event: StorageEvent) => { if (event.key === LOGOUT_EVENT) clearSession(); };
+    window.addEventListener('storage', listener);
+    return () => window.removeEventListener('storage', listener);
+  }, [clearSession]);
   const login = useCallback(async (data: LoginRequest) => {
     const response = await authService.login(data);
-    const session = response.data;
-    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, session.accessToken);
-    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, session.refreshToken);
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(session.user));
-    setAccessToken(session.accessToken);
-    setRefreshToken(session.refreshToken);
-    setUser(session.user);
-    scheduleAutoLogout(session.refreshToken);
-  }, []);
-
-  const register = useCallback(async (data: RegisterRequest) => {
-    const response = await authService.register(data);
-    const session = response.data;
-    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, session.accessToken);
-    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, session.refreshToken);
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(session.user));
-    setAccessToken(session.accessToken);
-    setRefreshToken(session.refreshToken);
-    setUser(session.user);
-    scheduleAutoLogout(session.refreshToken);
-  }, []);
-
-  const logout = useCallback(async () => {
-    try {
-      await authService.logout(refreshToken);
-    } catch (error) {
-      console.error('Erreur logout:', error);
-    } finally {
-      clearSession();
-    }
-  }, [refreshToken, clearSession]);
-
-  // Intercepteurs Axios : ajout du token et renouvellement automatique après un 401.
+    generation.current++;
+    cache.clear();
+    saveSession({ ...response.data, rememberMe: data.rememberMe === true });
+  }, [saveSession, cache]);
+  const register = useCallback(async (data: RegisterRequest) => { await authService.register(data); }, []);
   useEffect(() => {
-    const requestInterceptor = api.interceptors.request.use((config) => {
-      if (accessToken) {
-        config.headers.Authorization = `Bearer ${accessToken}`;
-      }
+    const requestId = api.interceptors.request.use(config => {
+      if (current.current && !config.headers.Authorization) config.headers.Authorization = `Bearer ${current.current.accessToken}`;
       return config;
     });
-
-    const responseInterceptor = api.interceptors.response.use(
-      (response) => response,
-      async (error: AxiosError) => {
-        const request = error.config as RetryableRequest | undefined;
-        const isAuthRequest = request?.url?.startsWith('/auth/') ?? false;
-
-        if (error.response?.status !== 401 || !request || request._retry || isAuthRequest) {
-          return Promise.reject(error);
-        }
-
-        const storedRefreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-        if (!storedRefreshToken) {
-          clearSession();
-          return Promise.reject(error);
-        }
-
-        request._retry = true;
-
-        try {
-          if (!accessTokenRefresh) {
-            accessTokenRefresh = authService.refresh(storedRefreshToken)
-              .then((response) => response.data.accessToken)
-              .finally(() => { accessTokenRefresh = null; });
-          }
-
-          const renewedAccessToken = await accessTokenRefresh;
-          localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, renewedAccessToken);
-          setAccessToken(renewedAccessToken);
-          request.headers.Authorization = `Bearer ${renewedAccessToken}`;
-          return api(request);
-        } catch (refreshError) {
-          clearSession();
-          return Promise.reject(refreshError);
-        }
-      },
-    );
-
-    return () => {
-      api.interceptors.request.eject(requestInterceptor);
-      api.interceptors.response.eject(responseInterceptor);
-    };
-  }, [accessToken, clearSession]);
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        accessToken,
-        isLoading,
-        isAuthenticated: !!accessToken && !!user,
-        login,
-        register,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+    const responseId = api.interceptors.response.use(response => response, async (error: AxiosError) => {
+      const request = error.config as RetryableRequest | undefined;
+      if (error.response?.status !== 401 || !request || request._retry || request.url?.startsWith('/auth/')) return Promise.reject(error);
+      const saved = current.current;
+      if (!saved) return Promise.reject(error);
+      request._retry = true;
+      const version = generation.current;
+      try {
+        if (!refreshing.current) refreshing.current = authService.refresh(saved.refreshToken).then(r => r.data.accessToken).finally(() => { refreshing.current = null; });
+        const token = await refreshing.current;
+        if (version !== generation.current) return Promise.reject(error);
+        saveSession({ ...saved, accessToken: token });
+        request.headers.Authorization = `Bearer ${token}`;
+        return api(request);
+      } catch (refreshError) {
+        if (version === generation.current) clearSession();
+        return Promise.reject(refreshError);
+      }
+    });
+    return () => { api.interceptors.request.eject(requestId); api.interceptors.response.eject(responseId); };
+  }, [clearSession, saveSession]);
+  return <AuthContext.Provider value={{ user: session?.user ?? null, accessToken: session?.accessToken ?? null,
+    isLoading, isAuthenticated: !!session, login, register, logout }}>{children}</AuthContext.Provider>;
 }
-
-export function useAuth(): AuthContextType {
+export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

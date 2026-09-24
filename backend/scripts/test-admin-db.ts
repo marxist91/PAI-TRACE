@@ -18,7 +18,7 @@ async function main() {
   process.env.DATABASE_URL = target;
   const { prisma } = await import('../src/lib/prisma');
   const { createApp } = await import('../src/app');
-  const { generateAccessToken } = await import('../src/middleware/auth');
+  const { generateAccessToken, createRefreshToken, verifyRefreshToken } = await import('../src/middleware/auth');
   const { evaluateAnomaly } = await import('../src/services/anomaly-rules');
   const { rulesSchema } = await import('../src/services/operational-settings');
   const app = createApp();
@@ -33,11 +33,11 @@ async function main() {
   try {
     const admin = await prisma.user.create({ data: { email: `admin-${run}@example.invalid`, password: 'INUTILISABLE', nom: 'Test', prenom: 'Admin', role: 'ADMIN' } });
     ids.push(admin.id);
-    const token = generateAccessToken(admin);
+    const token = generateAccessToken(verifyRefreshToken(await createRefreshToken(admin.id)));
     const auth = { Authorization: `Bearer ${token}` };
     const logisticien = await prisma.user.create({ data: { email: `logisticien-${run}@example.invalid`, password: 'INUTILISABLE', nom: 'Test', prenom: 'Logistique', role: 'LOGISTICIEN' } });
     ids.push(logisticien.id);
-    const logisticAuth = { Authorization: `Bearer ${generateAccessToken(logisticien)}` };
+    const logisticAuth = { Authorization: `Bearer ${generateAccessToken(verifyRefreshToken(await createRefreshToken(logisticien.id)))}` };
     for (const route of ['/api/users', '/api/settings']) {
       assert.equal((await request(app).get(route).set(logisticAuth)).status, 403);
       assert.equal((await request(app).put(`${route}${route.endsWith('users') ? `/${admin.id}` : ''}`).set(logisticAuth).send({})).status, 403);

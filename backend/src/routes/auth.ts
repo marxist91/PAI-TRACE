@@ -10,7 +10,9 @@ import {
   authenticate,
   requireRole,
   AuthRequest,
+  ActiveSessionError,
 } from '../middleware/auth';
+import { disconnectUser } from '../realtime';
 
 const router = Router();
 
@@ -25,8 +27,9 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email('Email invalide'),
+  email: z.string().trim().email('Email invalide').transform(value => value.toLowerCase()),
   password: z.string().min(1, 'Mot de passe requis'),
+  rememberMe: z.boolean().default(false),
 });
 
 const refreshSchema = z.object({
@@ -85,10 +88,7 @@ router.post('/register', authenticate, requireRole('ADMIN'), async (req: Request
       },
     });
 
-    const accessToken = generateAccessToken({ id: user.id, email: user.email, role: user.role });
-    const refreshToken = await createRefreshToken(user.id);
-
-    res.status(201).json({ user, accessToken, refreshToken });
+    res.status(201).json({ user });
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: 'Données invalides', details: error.issues });
@@ -122,8 +122,9 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const accessToken = generateAccessToken(user);
-    const refreshToken = await createRefreshToken(user.id);
+    const refreshToken = await createRefreshToken(user.id, data.rememberMe, user.password);
+    const accessToken = generateAccessToken(verifyRefreshToken(refreshToken));
+    disconnectUser(user.id);
 
     res.json({
       user: {
@@ -138,6 +139,9 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       refreshToken,
     });
   } catch (error) {
+    if (error instanceof ActiveSessionError) {
+      res.status(409).json({ error: error.message, code: 'SESSION_ALREADY_ACTIVE' }); return;
+    }
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: 'Données invalides', details: error.issues });
       return;
@@ -175,12 +179,12 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
 
     // Vérifier la signature du refresh token
     const decoded = verifyRefreshToken(refreshToken);
-    if ((decoded.tokenVersion ?? 0) !== storedToken.user.tokenVersion) {
+    if (!decoded.sessionId || decoded.sessionId !== storedToken.id || (decoded.tokenVersion ?? 0) !== storedToken.user.tokenVersion) {
       res.status(401).json({ error: 'Session révoquée. Reconnectez-vous.' }); return;
     }
 
     // Générer un nouvel access token
-    const accessToken = generateAccessToken(storedToken.user);
+    const accessToken = generateAccessToken({ ...storedToken.user, sessionId: decoded.sessionId });
 
     res.json({ accessToken });
   } catch (error) {
@@ -197,8 +201,9 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
 router.post('/logout', async (req: Request, res: Response): Promise<void> => {
   try {
     const { refreshToken } = req.body;
-    if (refreshToken) {
-      await revokeRefreshToken(refreshToken);
+    if (typeof refreshToken === 'string') {
+      const userId = await revokeRefreshToken(refreshToken);
+      if (userId) disconnectUser(userId);
     }
     res.json({ message: 'Déconnexion réussie' });
   } catch (error) {
